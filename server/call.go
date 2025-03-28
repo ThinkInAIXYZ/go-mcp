@@ -120,24 +120,24 @@ func (server *Server) callAndParse(ctx context.Context, sessionID string, method
 
 // 负责request和response的拼接
 func (server *Server) callClient(ctx context.Context, sessionID string, method protocol.Method, params protocol.ServerRequest) (json.RawMessage, error) {
-	value, ok := server.sessionID2session.Load(sessionID)
+	// 获取会话数据
+	sessionData, ok := server.GetSession(sessionID)
 	if !ok {
 		return nil, pkg.NewLackSessionError(sessionID)
 	}
-	session := value.(*session)
 
-	requestID := strconv.FormatInt(session.requestID.Add(1), 10)
+	requestID := strconv.FormatInt(sessionData.requestID.Add(1), 10)
 
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
 		return nil, err
 	}
 
 	respChan := make(chan *protocol.JSONRPCResponse)
-	session.reqID2respChan.Set(requestID, respChan)
+	sessionData.reqID2respChan.Set(requestID, respChan)
 
 	select {
 	case <-ctx.Done():
-		session.reqID2respChan.Remove(requestID)
+		sessionData.reqID2respChan.Remove(requestID)
 		return nil, ctx.Err()
 	case response := <-respChan:
 		if err := response.Error; err != nil {

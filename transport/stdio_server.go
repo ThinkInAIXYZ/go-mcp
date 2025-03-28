@@ -14,6 +14,7 @@ const stdioSessionID = "stdio"
 
 type stdioServerTransport struct {
 	receiver ServerReceiver
+	manager  pkg.TransportSessionManager
 	reader   *bufio.Reader
 	writer   io.Writer
 
@@ -60,6 +61,10 @@ func (t *stdioServerTransport) Send(ctx context.Context, sessionID string, msg M
 
 func (t *stdioServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
+}
+
+func (t *stdioServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+	t.manager = manager
 }
 
 func (t *stdioServerTransport) Shutdown(ctx context.Context, serverCtx context.Context) error {

@@ -46,6 +46,9 @@ type ServerTransport interface {
 	// SetReceiver 设置对对端消息的处理器
 	SetReceiver(ServerReceiver)
 
+	// SetSessionManager 设置会话管理器
+	SetSessionManager(manager pkg.TransportSessionManager)
+
 	// Shutdown 优雅关闭, 内部实现时需要先停止对消息的接收，再等待 serverCtx 被 cancel，同时使用 userCtx 控制超时。
 	// userCtx is used to control the timeout of the server shutdown.
 	// serverCtx is used to coordinate the internal cleanup sequence:

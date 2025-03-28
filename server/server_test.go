@@ -12,7 +12,6 @@ import (
 	"go-mcp/transport"
 
 	"github.com/bytedance/sonic"
-	"github.com/google/uuid"
 )
 
 func TestServer(t *testing.T) {
@@ -74,7 +73,7 @@ func TestServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			uuid, _ := uuid.NewUUID()
+			uuid := pkg.GenerateUUID()
 			req := protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
 			reqBytes, err := sonic.Marshal(req)
 			if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"go-mcp/pkg"
 	"go-mcp/protocol"
@@ -16,6 +17,9 @@ import (
 
 func (server *Server) Receive(ctx context.Context, sessionID string, msg []byte) error {
 	ctx = setSessionIDToCtx(ctx, sessionID)
+	
+	// 刷新会话状态
+	server.refreshSession(sessionID)
 
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
@@ -60,6 +64,7 @@ func (server *Server) Receive(ctx context.Context, sessionID string, msg []byte)
 		defer server.inFlyRequest.Done()
 		return errors.New("server already shutdown")
 	}
+
 	go func() {
 		defer pkg.Recover()
 		defer server.inFlyRequest.Done()
@@ -143,13 +148,13 @@ func (server *Server) receiveNotify(ctx context.Context, sessionID string, notif
 }
 
 func (server *Server) receiveResponse(ctx context.Context, sessionID string, response *protocol.JSONRPCResponse) error {
-	value, ok := server.sessionID2session.Load(sessionID)
+	// 获取会话数据
+	sessionData, ok := server.GetSession(sessionID)
 	if !ok {
 		return pkg.NewLackSessionError(sessionID)
 	}
-	session := value.(*session)
 
-	respChan, ok := session.reqID2respChan.Get(fmt.Sprint(response.ID))
+	respChan, ok := sessionData.reqID2respChan.Get(fmt.Sprint(response.ID))
 	if !ok {
 		return fmt.Errorf("%w: sessionID=%+v, requestID=%+v", pkg.ErrLackResponseChan, sessionID, response.ID)
 	}
@@ -160,4 +165,14 @@ func (server *Server) receiveResponse(ctx context.Context, sessionID string, res
 		return fmt.Errorf("response repeat: sessionID=%+v, response=%+v", sessionID, response)
 	}
 	return nil
+}
+
+// refreshSession 刷新会话状态
+// 根据会话管理器类型选择最优方式更新会话
+func (server *Server) refreshSession(sessionID string) {
+	// 统一使用UpdateSession方法刷新会话状态
+	server.sessionManager.UpdateSession(sessionID, func(state *pkg.SessionState) bool {
+		state.LastActiveAt = time.Now()
+		return true
+	})
 }

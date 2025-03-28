@@ -2,11 +2,48 @@ package transport
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// MockSessionManager是一个简单的TransportSessionManager实现，用于测试
+type MockSessionManager struct {
+	sessions sync.Map // key=sessionID, value=chan []byte
+}
+
+// CreateSession实现TransportSessionManager接口
+func (m *MockSessionManager) CreateSession() (string, chan []byte) {
+	sessionID := "test-session-id"
+	sessionChan := make(chan []byte, 64)
+	m.sessions.Store(sessionID, sessionChan)
+	return sessionID, sessionChan
+}
+
+// GetSessionChan实现TransportSessionManager接口
+func (m *MockSessionManager) GetSessionChan(sessionID string) (chan []byte, bool) {
+	value, ok := m.sessions.Load(sessionID)
+	if !ok {
+		return nil, false
+	}
+	ch, ok := value.(chan []byte)
+	return ch, ok
+}
+
+// CloseSession实现TransportSessionManager接口
+func (m *MockSessionManager) CloseSession(sessionID string) {
+	value, ok := m.sessions.Load(sessionID)
+	if !ok {
+		return
+	}
+	ch, ok := value.(chan []byte)
+	if ok {
+		close(ch)
+	}
+	m.sessions.Delete(sessionID)
+}
 
 type serverReceive func(ctx context.Context, sessionID string, msg []byte) error
 
@@ -27,6 +64,10 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		expectedMsgWithServer = string(msg)
 		return nil
 	}))
+
+	// 设置MockSessionManager用于测试
+	mockSessionManager := &MockSessionManager{}
+	server.SetSessionManager(mockSessionManager)
 
 	msgWithClient := "hello"
 	expectedMsgWithClient := ""

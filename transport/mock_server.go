@@ -13,6 +13,7 @@ const mockSessionID = "mock"
 
 type MockServerTransport struct {
 	receiver ServerReceiver
+	manager  pkg.TransportSessionManager
 
 	in  io.Reader
 	out io.Writer
@@ -52,6 +53,10 @@ func (t *MockServerTransport) Send(ctx context.Context, sessionID string, msg Me
 
 func (t *MockServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
+}
+
+func (t *MockServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+	t.manager = manager
 }
 
 func (t *MockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {

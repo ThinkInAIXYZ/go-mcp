@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"go-mcp/pkg"
-
-	"github.com/google/uuid"
 )
 
 type SSEServerTransportOption func(*sseServerTransport)
@@ -60,7 +58,8 @@ type sseServerTransport struct {
 
 	messageEndpointFullURL string // 自动生成
 
-	sessionStore pkg.SessionStore
+	// sessionStore被移除，使用SessionManager替代
+	sessionManager pkg.TransportSessionManager
 
 	inFlySend sync.WaitGroup
 
@@ -97,13 +96,12 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &sseServerTransport{
-		ctx:          ctx,
-		cancel:       cancel,
-		sessionStore: pkg.NewMemorySessionStore(),
-		logger:       pkg.DefaultLogger,
-		ssePath:      "/sse",
-		messagePath:  "/message",
-		urlPrefix:    "http://" + addr,
+		ctx:         ctx,
+		cancel:      cancel,
+		logger:      pkg.DefaultLogger,
+		ssePath:     "/sse",
+		messagePath: "/message",
+		urlPrefix:   "http://" + addr,
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -135,7 +133,6 @@ func NewSSEServerTransportAndHandler(messageEndpointFullURL string, opts ...SSES
 		ctx:                    ctx,
 		cancel:                 cancel,
 		messageEndpointFullURL: messageEndpointFullURL,
-		sessionStore:           pkg.NewMemorySessionStore(),
 		logger:                 pkg.DefaultLogger,
 	}
 	for _, opt := range opts {
@@ -143,6 +140,11 @@ func NewSSEServerTransportAndHandler(messageEndpointFullURL string, opts ...SSES
 	}
 
 	return t, &SSEHandler{transport: t}, nil
+}
+
+// SetSessionManager 实现ServerTransport接口
+func (t *sseServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+	t.sessionManager = manager
 }
 
 func (t *sseServerTransport) Run() error {
@@ -167,13 +169,10 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	default:
 	}
 
-	conn, ok := t.sessionStore.Load(sessionID)
+	// 使用sessionManager获取会话通道
+	c, ok := t.sessionManager.GetSessionChan(sessionID)
 	if !ok {
 		return pkg.NewLackSessionError(sessionID)
-	}
-	c, ok := conn.(chan []byte)
-	if !ok {
-		return fmt.Errorf("sessionID=%s invalid connection type: %T", sessionID, conn)
 	}
 
 	select {
@@ -207,22 +206,26 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 
-	// Create an SSE connection
-	sessionChan := make(chan []byte, 64)
-	sessionID := uuid.New().String()
-	t.sessionStore.Store(sessionID, sessionChan)
-	defer t.sessionStore.Delete(sessionID)
+	// 使用sessionManager创建会话
+	sessionID, sessionChan := t.sessionManager.CreateSession()
+	defer t.sessionManager.CloseSession(sessionID)
 
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointFullURL, sessionID)
 	// Send the initial endpoint event
 	_, _ = fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", uri)
 	flusher.Flush()
 
-	for msg := range sessionChan {
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case <-t.ctx.Done():
+			return
+		case msg, ok := <-sessionChan:
+			if !ok {
+				// 通道已关闭
+				return
+			}
 			_, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", msg)
 			if err != nil {
 				t.logger.Errorf("Failed to write message: %v", err)
@@ -251,7 +254,8 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_, ok := t.sessionStore.Load(sessionID)
+	// 使用sessionManager验证会话是否存在
+	_, ok := t.sessionManager.GetSessionChan(sessionID)
 	if !ok {
 		t.writeError(w, http.StatusBadRequest, "Invalid session ID")
 		return
@@ -290,18 +294,9 @@ func (t *sseServerTransport) writeError(w http.ResponseWriter, code int, message
 func (t *sseServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
 	shutdownFunc := func() {
 		<-serverCtx.Done()
-
 		t.cancel()
-
 		t.inFlySend.Wait()
-
-		t.sessionStore.Range(func(key string, value interface{}) bool {
-			if c, ok := value.(chan []byte); ok {
-				close(c)
-			}
-			return true
-		})
-
+		// 不再需要关闭session通道，这由Server负责
 	}
 
 	if t.httpSvr == nil {
