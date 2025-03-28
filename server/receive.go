@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go-mcp/session"
 	"time"
 
 	"go-mcp/pkg"
@@ -17,7 +18,7 @@ import (
 
 func (server *Server) Receive(ctx context.Context, sessionID string, msg []byte) error {
 	ctx = setSessionIDToCtx(ctx, sessionID)
-	
+
 	// 刷新会话状态
 	server.refreshSession(sessionID)
 
@@ -171,7 +172,7 @@ func (server *Server) receiveResponse(ctx context.Context, sessionID string, res
 // 根据会话管理器类型选择最优方式更新会话
 func (server *Server) refreshSession(sessionID string) {
 	// 统一使用UpdateSession方法刷新会话状态
-	server.sessionManager.UpdateSession(sessionID, func(state *pkg.SessionState) bool {
+	server.sessionManager.UpdateSession(sessionID, func(state *session.State) bool {
 		state.LastActiveAt = time.Now()
 		return true
 	})

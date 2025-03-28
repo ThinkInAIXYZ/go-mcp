@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"go-mcp/session"
 	"io"
 	"net/http"
 	"net/url"
@@ -59,7 +60,7 @@ type sseServerTransport struct {
 	messageEndpointFullURL string // 自动生成
 
 	// sessionStore被移除，使用SessionManager替代
-	sessionManager pkg.TransportSessionManager
+	sessionManager session.TransportSessionManager
 
 	inFlySend sync.WaitGroup
 
@@ -143,7 +144,7 @@ func NewSSEServerTransportAndHandler(messageEndpointFullURL string, opts ...SSES
 }
 
 // SetSessionManager 实现ServerTransport接口
-func (t *sseServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+func (t *sseServerTransport) SetSessionManager(manager session.TransportSessionManager) {
 	t.sessionManager = manager
 }
 

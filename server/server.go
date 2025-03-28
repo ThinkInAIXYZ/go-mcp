@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"go-mcp/session"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,7 +27,7 @@ type Server struct {
 	cancelledNotifyHandler func(ctx context.Context, notifyParam *protocol.CancelledNotification) error
 
 	// 会话管理器，处理所有会话相关操作
-	sessionManager pkg.SessionManager
+	sessionManager session.Manager
 
 	// 会话管理适配器，用于暴露给transport层
 	sessionManagerAdapter *sessionManagerAdapter
@@ -53,8 +54,7 @@ type sessionManagerAdapter struct {
 	server *Server
 }
 
-// session数据结构，存储在SessionState.Data中
-type sessionData struct {
+type SessionData struct {
 	// 用于为每个请求生成唯一的请求ID
 	requestID atomic.Int64
 
@@ -71,9 +71,9 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 	server := &Server{
 		transport:            t,
 		logger:               pkg.DefaultLogger,
-		sessionManager:       pkg.NewSessionManager(pkg.MemorySessionManagerType, nil), // 默认使用内存会话管理器
-		sessionCleanInterval: 5 * time.Minute,  // 默认5分钟清理一次过期会话
-		sessionMaxIdleTime:   30 * time.Minute, // 默认30分钟无活动视为过期
+		sessionManager:       session.NewSessionManager(session.MemorySessionManagerType, nil), // 默认使用内存会话管理器
+		sessionCleanInterval: 5 * time.Minute,                                                  // 默认5分钟清理一次过期会话
+		sessionMaxIdleTime:   30 * time.Minute,                                                 // 默认30分钟无活动视为过期
 		sessionCleanStopCh:   make(chan struct{}),
 	}
 
@@ -95,21 +95,21 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 // NewServerWithSessionManager 创建一个新的MCP服务器实例，使用指定的会话管理器类型
 func NewServerWithSessionManager(
 	t transport.ServerTransport,
-	managerType pkg.SessionManagerType,
-	managerOptions *pkg.SessionManagerOptions,
+	managerType session.ManagerType,
+	managerOptions *session.ManagerOptions,
 	opts ...Option,
 ) (*Server, error) {
 	// 如果没有提供会话管理器选项，使用默认选项
 	if managerOptions == nil {
-		managerOptions = pkg.DefaultSessionManagerOptions()
+		managerOptions = session.DefaultSessionManagerOptions()
 	}
 
 	server := &Server{
 		transport:            t,
 		logger:               pkg.DefaultLogger,
-		sessionManager:       pkg.NewSessionManager(managerType, managerOptions), // 使用指定类型的会话管理器
-		sessionCleanInterval: 5 * time.Minute,  // 默认5分钟清理一次过期会话
-		sessionMaxIdleTime:   managerOptions.DefaultMaxIdleTime, // 使用管理器选项中的过期时间
+		sessionManager:       session.NewSessionManager(managerType, managerOptions), // 使用指定类型的会话管理器
+		sessionCleanInterval: 5 * time.Minute,                                        // 默认5分钟清理一次过期会话
+		sessionMaxIdleTime:   managerOptions.DefaultMaxIdleTime,                      // 使用管理器选项中的过期时间
 		sessionCleanStopCh:   make(chan struct{}),
 	}
 
@@ -218,7 +218,7 @@ func (server *Server) Shutdown(userCtx context.Context) error {
 	close(server.sessionCleanStopCh)
 
 	// 如果使用的是TimeWheelSessionManager，需要调用其Shutdown方法
-	if twSessionManager, ok := server.sessionManager.(*pkg.TimeWheelSessionManager); ok {
+	if twSessionManager, ok := server.sessionManager.(*session.TimeWheelSessionManager); ok {
 		twSessionManager.Shutdown()
 	}
 
@@ -242,18 +242,18 @@ func (server *Server) Shutdown(userCtx context.Context) error {
 }
 
 // GetSessionState 获取会话状态（用于内部使用）
-func (server *Server) GetSessionState(sessionID string) (*pkg.SessionState, bool) {
+func (server *Server) GetSessionState(sessionID string) (*session.State, bool) {
 	return server.sessionManager.GetSession(sessionID)
 }
 
 // GetSession 获取会话数据
-func (server *Server) GetSession(sessionID string) (*sessionData, bool) {
+func (server *Server) GetSession(sessionID string) (*SessionData, bool) {
 	state, ok := server.GetSessionState(sessionID)
 	if !ok {
 		return nil, false
 	}
 
-	data, ok := state.Data.(*sessionData)
+	data, ok := state.Data.(*SessionData)
 	if !ok {
 		return nil, false
 	}
@@ -269,7 +269,7 @@ func (a *sessionManagerAdapter) GetSessionChan(sessionID string) (chan []byte, b
 // CreateSession 创建新的会话，返回会话ID和消息通道
 func (a *sessionManagerAdapter) CreateSession() (string, chan []byte) {
 	// 创建会话数据
-	data := &sessionData{
+	data := &SessionData{
 		reqID2respChan: cmap.New[chan *protocol.JSONRPCResponse](),
 		first:          true,
 		readyChan:      make(chan struct{}),

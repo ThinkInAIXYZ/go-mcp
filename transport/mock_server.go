@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"go-mcp/session"
 	"io"
 
 	"go-mcp/pkg"
@@ -13,7 +14,7 @@ const mockSessionID = "mock"
 
 type MockServerTransport struct {
 	receiver ServerReceiver
-	manager  pkg.TransportSessionManager
+	manager  session.TransportSessionManager
 
 	in  io.Reader
 	out io.Writer
@@ -55,7 +56,7 @@ func (t *MockServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
 }
 
-func (t *MockServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+func (t *MockServerTransport) SetSessionManager(manager session.TransportSessionManager) {
 	t.manager = manager
 }
 

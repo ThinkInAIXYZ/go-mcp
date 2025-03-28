@@ -1,6 +1,7 @@
-package pkg
+package session
 
 import (
+	"go-mcp/pkg"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -9,10 +10,10 @@ import (
 // TimeWheelSessionManager 基于时间轮算法的会话管理器
 // 相比MemorySessionManager，它可以更高效地处理会话过期
 type TimeWheelSessionManager struct {
-	sessions  sync.Map     // 存储所有会话
-	count     atomic.Int64 // 会话计数
-	timeWheel *TimeWheel   // 时间轮
-	mu        sync.Mutex   // 互斥锁
+	sessions  sync.Map       // 存储所有会话
+	count     atomic.Int64   // 会话计数
+	timeWheel *pkg.TimeWheel // 时间轮
+	mu        sync.Mutex     // 互斥锁
 
 	// 默认最大空闲时间
 	defaultMaxIdleTime time.Duration
@@ -29,7 +30,7 @@ func NewTimeWheelSessionManager(tickInterval time.Duration, wheelSize int, defau
 	}
 
 	// 创建时间轮，并设置过期任务的处理函数
-	m.timeWheel = NewTimeWheel(tickInterval, wheelSize, func(task *Task) {
+	m.timeWheel = pkg.NewTimeWheel(tickInterval, wheelSize, func(task *pkg.Task) {
 		m.handleExpiredSession(task.ID)
 	})
 
@@ -51,11 +52,11 @@ func (m *TimeWheelSessionManager) Shutdown() {
 }
 
 // CreateSession 创建新的会话
-func (m *TimeWheelSessionManager) CreateSession(data interface{}) (string, *SessionState) {
-	sessionID := GenerateUUID()
+func (m *TimeWheelSessionManager) CreateSession(data interface{}) (string, *State) {
+	sessionID := pkg.GenerateUUID()
 	now := time.Now()
 
-	state := &SessionState{
+	state := &State{
 		ID:           sessionID,
 		CreatedAt:    now,
 		LastActiveAt: now,
@@ -75,13 +76,13 @@ func (m *TimeWheelSessionManager) CreateSession(data interface{}) (string, *Sess
 }
 
 // GetSession 获取会话状态并刷新最后活跃时间
-func (m *TimeWheelSessionManager) GetSession(sessionID string) (*SessionState, bool) {
+func (m *TimeWheelSessionManager) GetSession(sessionID string) (*State, bool) {
 	value, has := m.sessions.Load(sessionID)
 	if !has {
 		return nil, false
 	}
 
-	state, ok := value.(*SessionState)
+	state, ok := value.(*State)
 	if !ok {
 		return nil, false
 	}
@@ -112,7 +113,7 @@ func (m *TimeWheelSessionManager) GetSessionChan(sessionID string) (chan []byte,
 
 // UpdateSession 更新会话状态
 // 此方法优化了时间轮任务的更新逻辑，提高效率
-func (m *TimeWheelSessionManager) UpdateSession(sessionID string, updater func(*SessionState) bool) bool {
+func (m *TimeWheelSessionManager) UpdateSession(sessionID string, updater func(*State) bool) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -121,7 +122,7 @@ func (m *TimeWheelSessionManager) UpdateSession(sessionID string, updater func(*
 		return false
 	}
 
-	state, ok := value.(*SessionState)
+	state, ok := value.(*State)
 	if !ok {
 		return false
 	}
@@ -158,7 +159,7 @@ func (m *TimeWheelSessionManager) CloseSession(sessionID string) {
 		return
 	}
 
-	state, ok := value.(*SessionState)
+	state, ok := value.(*State)
 	if !ok {
 		return
 	}
@@ -188,7 +189,7 @@ func (m *TimeWheelSessionManager) CleanExpiredSessions(maxIdleTime time.Duration
 
 	m.sessions.Range(func(key, value interface{}) bool {
 		sessionID := key.(string)
-		state, ok := value.(*SessionState)
+		state, ok := value.(*State)
 		if !ok {
 			return true
 		}
@@ -217,7 +218,7 @@ func (m *TimeWheelSessionManager) handleExpiredSession(sessionID string) {
 		return
 	}
 
-	state, ok := value.(*SessionState)
+	state, ok := value.(*State)
 	if !ok {
 		return
 	}
@@ -237,10 +238,10 @@ func (m *TimeWheelSessionManager) handleExpiredSession(sessionID string) {
 }
 
 // RangeSessions 遍历所有会话
-func (m *TimeWheelSessionManager) RangeSessions(f func(sessionID string, state *SessionState) bool) {
+func (m *TimeWheelSessionManager) RangeSessions(f func(sessionID string, state *State) bool) {
 	m.sessions.Range(func(key, value interface{}) bool {
 		sessionID := key.(string)
-		state, ok := value.(*SessionState)
+		state, ok := value.(*State)
 		if !ok {
 			return true
 		}

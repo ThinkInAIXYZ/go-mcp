@@ -3,6 +3,7 @@ package transport
 import (
 	"bufio"
 	"context"
+	"go-mcp/session"
 	"io"
 	"os"
 	"sync"
@@ -14,7 +15,7 @@ const stdioSessionID = "stdio"
 
 type stdioServerTransport struct {
 	receiver ServerReceiver
-	manager  pkg.TransportSessionManager
+	manager  session.TransportSessionManager
 	reader   *bufio.Reader
 	writer   io.Writer
 
@@ -63,7 +64,7 @@ func (t *stdioServerTransport) SetReceiver(receiver ServerReceiver) {
 	t.receiver = receiver
 }
 
-func (t *stdioServerTransport) SetSessionManager(manager pkg.TransportSessionManager) {
+func (t *stdioServerTransport) SetSessionManager(manager session.TransportSessionManager) {
 	t.manager = manager
 }
 

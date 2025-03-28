@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"go-mcp/session"
 
 	"go-mcp/pkg"
 )
@@ -47,7 +48,7 @@ type ServerTransport interface {
 	SetReceiver(ServerReceiver)
 
 	// SetSessionManager 设置会话管理器
-	SetSessionManager(manager pkg.TransportSessionManager)
+	SetSessionManager(manager session.TransportSessionManager)
 
 	// Shutdown 优雅关闭, 内部实现时需要先停止对消息的接收，再等待 serverCtx 被 cancel，同时使用 userCtx 控制超时。
 	// userCtx is used to control the timeout of the server shutdown.

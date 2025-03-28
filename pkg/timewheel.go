@@ -12,21 +12,21 @@ type TimeWheel struct {
 	interval time.Duration // 时间轮的最小时间单位（一个槽位的时间跨度）
 	ticker   *time.Ticker  // 定时器，用于触发时间轮的转动
 	slots    []*taskBucket // 时间轮的槽位，每个槽位是一个任务桶
-	
+
 	// 当前时间轮的状态
-	currentPos int              // 当前指针位置
-	slotNum    int              // 槽位数量
-	addTaskC   chan *Task       // 添加任务的通道
-	removeTaskC chan string     // 移除任务的通道
-	stopC      chan struct{}    // 停止时间轮的通道
-	
+	currentPos  int           // 当前指针位置
+	slotNum     int           // 槽位数量
+	addTaskC    chan *Task    // 添加任务的通道
+	removeTaskC chan string   // 移除任务的通道
+	stopC       chan struct{} // 停止时间轮的通道
+
 	// 时间轮的层级关系
-	parent     *TimeWheel       // 父级时间轮，用于处理超出当前时间轮范围的任务
-	maxTimeout time.Duration    // 当前时间轮能处理的最大超时时间
-	
+	parent     *TimeWheel    // 父级时间轮，用于处理超出当前时间轮范围的任务
+	maxTimeout time.Duration // 当前时间轮能处理的最大超时时间
+
 	// 任务执行器
-	executor func(*Task)        // 任务执行函数
-	
+	executor func(*Task) // 任务执行函数
+
 	// 并发控制
 	sync.RWMutex
 }
@@ -48,11 +48,11 @@ func newTaskBucket() *taskBucket {
 
 // Task 表示一个定时任务
 type Task struct {
-	ID        string        // 任务唯一标识
-	Delay     time.Duration // 延迟执行时间
-	Data      interface{}   // 任务数据
-	round     int           // 任务需要经过的轮数
-	expiration time.Time    // 任务的过期时间点
+	ID         string        // 任务唯一标识
+	Delay      time.Duration // 延迟执行时间
+	Data       interface{}   // 任务数据
+	round      int           // 任务需要经过的轮数
+	expiration time.Time     // 任务的过期时间点
 }
 
 // NewTimeWheel 创建一个新的时间轮
@@ -60,24 +60,24 @@ func NewTimeWheel(interval time.Duration, slotNum int, executor func(*Task)) *Ti
 	if interval <= 0 || slotNum <= 0 || executor == nil {
 		return nil
 	}
-	
+
 	tw := &TimeWheel{
-		interval:     interval,
-		slots:        make([]*taskBucket, slotNum),
-		currentPos:   0,
-		slotNum:      slotNum,
-		addTaskC:     make(chan *Task, 100),
-		removeTaskC:  make(chan string, 100),
-		stopC:        make(chan struct{}),
-		executor:     executor,
-		maxTimeout:   interval * time.Duration(slotNum),
+		interval:    interval,
+		slots:       make([]*taskBucket, slotNum),
+		currentPos:  0,
+		slotNum:     slotNum,
+		addTaskC:    make(chan *Task, 100),
+		removeTaskC: make(chan string, 100),
+		stopC:       make(chan struct{}),
+		executor:    executor,
+		maxTimeout:  interval * time.Duration(slotNum),
 	}
-	
+
 	// 初始化每个槽位的任务桶
 	for i := 0; i < slotNum; i++ {
 		tw.slots[i] = newTaskBucket()
 	}
-	
+
 	return tw
 }
 
@@ -100,7 +100,7 @@ func (tw *TimeWheel) run() {
 			tw.ticker = nil
 		}
 	}()
-	
+
 	for {
 		select {
 		case <-tw.ticker.C: // 时间轮转动
@@ -120,12 +120,12 @@ func (tw *TimeWheel) tickHandler() {
 	tw.Lock()
 	currentBucket := tw.slots[tw.currentPos]
 	tw.Unlock()
-	
+
 	tw.scanAndRunTasks(currentBucket)
-	
+
 	tw.Lock()
 	// 移动时间轮指针
-	if tw.currentPos == tw.slotNum - 1 {
+	if tw.currentPos == tw.slotNum-1 {
 		tw.currentPos = 0
 	} else {
 		tw.currentPos++
@@ -137,22 +137,22 @@ func (tw *TimeWheel) tickHandler() {
 func (tw *TimeWheel) scanAndRunTasks(bucket *taskBucket) {
 	bucket.Lock()
 	defer bucket.Unlock()
-	
+
 	for e := bucket.list.Front(); e != nil; {
 		task := e.Value.(*Task)
-		
+
 		if task.round > 0 { // 任务还需要经过多轮
 			task.round--
 			e = e.Next()
 			continue
 		}
-		
+
 		// 任务可以执行了
 		next := e.Next()
 		bucket.list.Remove(e)
 		delete(bucket.tasks, task.ID)
 		e = next
-		
+
 		// 异步执行任务，避免阻塞时间轮
 		go tw.executor(task)
 	}
@@ -163,30 +163,30 @@ func (tw *TimeWheel) addTask(task *Task) {
 	if task.Delay < 0 {
 		task.Delay = 0
 	}
-	
+
 	// 设置任务的过期时间
 	task.expiration = time.Now().Add(task.Delay)
-	
+
 	// 如果任务的延迟超过了当前时间轮的最大超时时间，且有父时间轮
 	if task.Delay > tw.maxTimeout && tw.parent != nil {
 		tw.parent.addTaskC <- task
 		return
 	}
-	
+
 	// 计算任务应该放在哪个槽位
 	pos, round := tw.getPositionAndRound(task.Delay)
 	task.round = round
-	
+
 	// 获取槽位的任务桶
 	bucket := tw.slots[pos]
-	
+
 	bucket.Lock()
 	// 如果任务已存在，先移除旧任务
 	if elem, ok := bucket.tasks[task.ID]; ok {
 		bucket.list.Remove(elem)
 		delete(bucket.tasks, task.ID)
 	}
-	
+
 	// 添加新任务
 	elem := bucket.list.PushBack(task)
 	bucket.tasks[task.ID] = elem
@@ -197,11 +197,11 @@ func (tw *TimeWheel) addTask(task *Task) {
 func (tw *TimeWheel) getPositionAndRound(delay time.Duration) (int, int) {
 	// 计算需要多少个时间单位
 	ticks := int(delay / tw.interval)
-	
+
 	// 计算轮数和位置
 	round := ticks / tw.slotNum
 	pos := (tw.currentPos + ticks) % tw.slotNum
-	
+
 	return pos, round
 }
 
@@ -210,7 +210,7 @@ func (tw *TimeWheel) removeTask(taskID string) {
 	if taskID == "" {
 		return
 	}
-	
+
 	// 遍历所有槽位，查找并移除任务
 	for _, bucket := range tw.slots {
 		bucket.Lock()
@@ -222,7 +222,7 @@ func (tw *TimeWheel) removeTask(taskID string) {
 		}
 		bucket.Unlock()
 	}
-	
+
 	// 如果当前时间轮没有找到，尝试在父时间轮中查找
 	if tw.parent != nil {
 		tw.parent.removeTaskC <- taskID
@@ -260,7 +260,7 @@ func NewHierarchicalTimeWheel(baseInterval time.Duration, baseSlotNum, levels in
 	if levels <= 0 {
 		levels = 1
 	}
-	
+
 	// 创建基础时间轮
 	var wheels []*TimeWheel
 	for i := 0; i < levels; i++ {
@@ -269,15 +269,15 @@ func NewHierarchicalTimeWheel(baseInterval time.Duration, baseSlotNum, levels in
 		if i > 0 {
 			interval = wheels[i-1].interval * time.Duration(baseSlotNum)
 		}
-		
+
 		wheel := NewTimeWheel(interval, baseSlotNum, executor)
 		wheels = append(wheels, wheel)
-		
+
 		// 设置父级时间轮
 		if i > 0 {
 			wheels[i-1].SetParent(wheel)
 		}
 	}
-	
+
 	return wheels[0] // 返回最底层的时间轮
-} 
+}
