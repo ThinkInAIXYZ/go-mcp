@@ -2,21 +2,15 @@ package session
 
 import (
 	"go-mcp/pkg"
-	"sync"
-	"sync/atomic"
 	"time"
 )
 
 // TimeWheelSessionManager 基于时间轮算法的会话管理器
 // 相比MemorySessionManager，它可以更高效地处理会话过期
 type TimeWheelSessionManager struct {
-	sessions  sync.Map       // 存储所有会话
-	count     atomic.Int64   // 会话计数
-	timeWheel *pkg.TimeWheel // 时间轮
-	mu        sync.Mutex     // 互斥锁
-
-	// 默认最大空闲时间
-	defaultMaxIdleTime time.Duration
+	BaseSessionManager
+	timeWheel          *pkg.TimeWheel // 时间轮
+	defaultMaxIdleTime time.Duration  // 默认会话最大空闲时间
 }
 
 // NewTimeWheelSessionManager 创建一个新的基于时间轮的会话管理器
@@ -51,21 +45,10 @@ func (m *TimeWheelSessionManager) Shutdown() {
 	m.CloseAllSessions()
 }
 
-// CreateSession 创建新的会话
+// CreateSession 重写CreateSession方法，添加时间轮任务
 func (m *TimeWheelSessionManager) CreateSession(data interface{}) (string, *State) {
-	sessionID := pkg.GenerateUUID()
-	now := time.Now()
-
-	state := &State{
-		ID:           sessionID,
-		CreatedAt:    now,
-		LastActiveAt: now,
-		Data:         data,
-		MessageChan:  make(chan []byte, 64),
-	}
-
-	m.sessions.Store(sessionID, state)
-	m.count.Add(1) // 增加计数
+	// 调用基础实现创建会话
+	sessionID, state := m.BaseSessionManager.CreateSession(data)
 
 	// 添加到时间轮，设置过期时间
 	if m.timeWheel != nil {
@@ -75,71 +58,39 @@ func (m *TimeWheelSessionManager) CreateSession(data interface{}) (string, *Stat
 	return sessionID, state
 }
 
-// GetSession 获取会话状态并刷新最后活跃时间
+// GetSession 重写GetSession方法，更新时间轮任务
 func (m *TimeWheelSessionManager) GetSession(sessionID string) (*State, bool) {
-	value, has := m.sessions.Load(sessionID)
+	state, has := m.BaseSessionManager.GetSession(sessionID)
 	if !has {
 		return nil, false
 	}
 
-	state, ok := value.(*State)
-	if !ok {
-		return nil, false
-	}
-
-	// 更新最后活跃时间
+	// 更新时间轮任务，但避免频繁更新
+	// 只有当会话已经活跃较长时间，才更新时间轮任务
 	now := time.Now()
-	oldTime := state.LastActiveAt
-	state.LastActiveAt = now
-
-	// 更新时间轮任务，使用新的过期时间
-	// 只有当会话已经活跃较长时间，才更新时间轮任务，避免频繁更新
-	if now.Sub(oldTime) > m.defaultMaxIdleTime/4 && m.timeWheel != nil {
+	if now.Sub(state.LastActiveAt) > m.defaultMaxIdleTime/4 && m.timeWheel != nil {
 		m.timeWheel.AddTask(sessionID, m.defaultMaxIdleTime, nil)
 	}
 
 	return state, true
 }
 
-// GetSessionChan 获取会话消息通道
-func (m *TimeWheelSessionManager) GetSessionChan(sessionID string) (chan []byte, bool) {
-	state, has := m.GetSession(sessionID)
-	if !has {
-		return nil, false
-	}
-
-	return state.MessageChan, true
-}
-
-// UpdateSession 更新会话状态
-// 此方法优化了时间轮任务的更新逻辑，提高效率
+// UpdateSession 重写UpdateSession方法，更新时间轮任务
 func (m *TimeWheelSessionManager) UpdateSession(sessionID string, updater func(*State) bool) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	// 获取修改前的时间
+	var oldTime time.Time
+	state, has := m.sessions.Load(sessionID)
+	if has {
+		oldTime = state.LastActiveAt
+	}
 
-	value, has := m.sessions.Load(sessionID)
-	if !has {
+	// 调用基础实现更新会话
+	if !m.BaseSessionManager.UpdateSession(sessionID, updater) {
 		return false
 	}
 
-	state, ok := value.(*State)
-	if !ok {
-		return false
-	}
-
-	oldTime := state.LastActiveAt
+	// 更新时间轮任务，但避免频繁更新
 	now := time.Now()
-
-	// 调用更新函数
-	if updated := updater(state); !updated {
-		return false
-	}
-
-	// 确保LastActiveAt已被更新为当前时间
-	state.LastActiveAt = now
-
-	// 更新时间轮任务，使用新的过期时间
-	// 只有当会话已经活跃较长时间，才更新时间轮任务，避免频繁更新
 	if now.Sub(oldTime) > m.defaultMaxIdleTime/4 && m.timeWheel != nil {
 		m.timeWheel.AddTask(sessionID, m.defaultMaxIdleTime, nil)
 	}
@@ -147,53 +98,23 @@ func (m *TimeWheelSessionManager) UpdateSession(sessionID string, updater func(*
 	return true
 }
 
-// CloseSession 关闭并删除会话
+// CloseSession 重写CloseSession方法，移除时间轮任务
 func (m *TimeWheelSessionManager) CloseSession(sessionID string) {
 	// 从时间轮中移除任务
 	if m.timeWheel != nil {
 		m.timeWheel.RemoveTask(sessionID)
 	}
 
-	value, ok := m.sessions.Load(sessionID)
-	if !ok {
-		return
-	}
-
-	state, ok := value.(*State)
-	if !ok {
-		return
-	}
-
-	// 关闭消息通道
-	close(state.MessageChan)
-	m.sessions.Delete(sessionID)
-	m.count.Add(-1) // 减少计数
+	// 调用基础实现关闭会话
+	m.BaseSessionManager.CloseSession(sessionID)
 }
 
-// CloseAllSessions 关闭所有会话
-func (m *TimeWheelSessionManager) CloseAllSessions() {
-	m.sessions.Range(func(key, value interface{}) bool {
-		sessionID := key.(string)
-		m.CloseSession(sessionID)
-		return true
-	})
-	m.count.Store(0) // 重置计数为0
-}
-
-// CleanExpiredSessions 清理过期会话
-// 时间轮会话管理器已经通过时间轮自动处理过期，
-// 这个方法主要用于兼容接口和手动触发清理
+// CleanExpiredSessions 重写CleanExpiredSessions方法，利用时间轮管理过期
 func (m *TimeWheelSessionManager) CleanExpiredSessions(maxIdleTime time.Duration) {
-	// 使用时间轮进行会话过期管理，所以这里只需将未添加的会话加入时间轮
+	// 由于已经使用时间轮管理过期，这里只处理那些可能没有添加到时间轮的会话
 	now := time.Now()
 
-	m.sessions.Range(func(key, value interface{}) bool {
-		sessionID := key.(string)
-		state, ok := value.(*State)
-		if !ok {
-			return true
-		}
-
+	m.sessions.Range(func(sessionID string, state *State) bool {
 		// 计算剩余的空闲时间
 		idleTime := now.Sub(state.LastActiveAt)
 		if idleTime > maxIdleTime {
@@ -213,13 +134,8 @@ func (m *TimeWheelSessionManager) CleanExpiredSessions(maxIdleTime time.Duration
 // 此方法会被时间轮调用
 func (m *TimeWheelSessionManager) handleExpiredSession(sessionID string) {
 	// 检查会话是否真的过期
-	value, has := m.sessions.Load(sessionID)
+	state, has := m.sessions.Load(sessionID)
 	if !has {
-		return
-	}
-
-	state, ok := value.(*State)
-	if !ok {
 		return
 	}
 
@@ -235,22 +151,4 @@ func (m *TimeWheelSessionManager) handleExpiredSession(sessionID string) {
 
 	// 会话确实过期，关闭它
 	m.CloseSession(sessionID)
-}
-
-// RangeSessions 遍历所有会话
-func (m *TimeWheelSessionManager) RangeSessions(f func(sessionID string, state *State) bool) {
-	m.sessions.Range(func(key, value interface{}) bool {
-		sessionID := key.(string)
-		state, ok := value.(*State)
-		if !ok {
-			return true
-		}
-
-		return f(sessionID, state)
-	})
-}
-
-// SessionCount 获取会话数量
-func (m *TimeWheelSessionManager) SessionCount() int {
-	return int(m.count.Load())
 }
