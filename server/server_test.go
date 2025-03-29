@@ -39,10 +39,20 @@ func TestServer(t *testing.T) {
 		outScan = bufio.NewScanner(out)
 	)
 
-	server, err := NewServer(transport.NewMockServerTransport(in, out))
+	server, err := NewServer(
+		transport.NewMockServerTransport(in, out),
+		WithInfo(protocol.Implementation{
+			Name:    "ExampleServer",
+			Version: "1.0.0",
+		}))
+
+	// TODO: add mock session id auto
+	server.sessionID2session.Store("mock", newSession())
 	if err != nil {
 		t.Fatalf("NewServer: %+v", err)
 	}
+
+	// add tool
 	testTool := &protocol.Tool{
 		Name:        "test_tool",
 		Description: "test_tool",
@@ -50,7 +60,60 @@ func TestServer(t *testing.T) {
 			"a": "int",
 		},
 	}
-	server.AddTool(testTool)
+	testToolCallContent := protocol.TextContent{
+		Type: "text",
+		Text: "pong",
+	}
+	server.AddTool(testTool, func(ctr protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+		return &protocol.CallToolResult{
+			Content: []protocol.Content{testToolCallContent},
+		}, nil
+	})
+
+	// add prompt
+	testPrompt := protocol.Prompt{
+		Name:        "test_prompt",
+		Description: "test_prompt_description",
+		Arguments: []protocol.PromptArgument{
+			{
+				Name:        "params1",
+				Description: "params1's description",
+				Required:    true,
+			},
+		},
+	}
+	testPromtGetResponse := &protocol.GetPromptResult{
+		Description: "test_prompt_description",
+	}
+	server.AddPrompt(testPrompt, func(protocol.GetPromptRequest) (*protocol.GetPromptResult, error) {
+		return testPromtGetResponse, nil
+	})
+
+	// add resource
+	testResource := protocol.Resource{
+		URI:      "file:///test.txt",
+		Name:     "test.txt",
+		MimeType: "text/plain-txt",
+	}
+	testResourceContent := protocol.TextResourceContents{
+		URI:      testResource.URI,
+		MimeType: testResource.MimeType,
+		Text:     "test",
+	}
+	server.AddResource(testResource, func(protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
+		return &protocol.ReadResourceResult{
+			Contents: []protocol.ResourceContents{
+				testResourceContent,
+			},
+		}, nil
+	})
+
+	// add resource template
+	testReourceTemplate := protocol.ResourceTemplate{
+		URITemplate: "file:///{path}",
+		Name:        "test",
+	}
+	server.AddResourceTemplate(testReourceTemplate)
 
 	go func() {
 		if err := server.Start(); err != nil {
@@ -69,6 +132,92 @@ func TestServer(t *testing.T) {
 			method:           protocol.ToolsList,
 			request:          protocol.ListToolsRequest{},
 			expectedResponse: protocol.ListToolsResult{Tools: []*protocol.Tool{testTool}},
+		},
+		{
+			name:   "test_call_tool",
+			method: protocol.ToolsCall,
+			request: protocol.CallToolRequest{
+				Name: testTool.Name,
+			},
+			expectedResponse: protocol.CallToolResult{
+				Content: []protocol.Content{
+					testToolCallContent,
+				},
+			},
+		},
+		{
+			name:    "test_initialize",
+			method:  protocol.Initialize,
+			request: protocol.InitializeRequest{},
+			expectedResponse: protocol.InitializeResult{
+				ProtocolVersion: protocol.PROTOCOL_VERSION,
+				Capabilities:    server.capabilities,
+				ServerInfo:      server.serverInfo,
+			},
+		},
+		{
+			name:             "test_ping",
+			method:           protocol.Ping,
+			request:          protocol.PingRequest{},
+			expectedResponse: protocol.PingResult{},
+		},
+		{
+			name:    "test_list_prompt",
+			method:  protocol.PromptsList,
+			request: protocol.ListPromptsRequest{},
+			expectedResponse: protocol.ListPromptsResult{
+				Prompts: []protocol.Prompt{testPrompt},
+			},
+		},
+		{
+			name:   "test_get_prompt",
+			method: protocol.PromptsGet,
+			request: protocol.GetPromptRequest{
+				Name: testPrompt.Name,
+			},
+			expectedResponse: testPromtGetResponse,
+		},
+		{
+			name:    "test_list_resource",
+			method:  protocol.ResourcesList,
+			request: protocol.ListResourcesRequest{},
+			expectedResponse: protocol.ListResourcesResult{
+				Resources: []protocol.Resource{testResource},
+			},
+		},
+		{
+			name:   "test_read_resource",
+			method: protocol.ResourcesRead,
+			request: protocol.ReadResourceRequest{
+				URI: testResource.URI,
+			},
+			expectedResponse: protocol.ReadResourceResult{
+				Contents: []protocol.ResourceContents{testResourceContent},
+			},
+		},
+		{
+			name:    "test_list_resource_template",
+			method:  protocol.ResourceListTemplates,
+			request: protocol.ListResourceTemplatesRequest{},
+			expectedResponse: protocol.ListResourceTemplatesResult{
+				ResourceTemplates: []protocol.ResourceTemplate{testReourceTemplate},
+			},
+		},
+		{
+			name:   "test_resource_subscribe",
+			method: protocol.ResourcesSubscribe,
+			request: protocol.SubscribeRequest{
+				URI: testResource.URI,
+			},
+			expectedResponse: protocol.SubscribeResult{},
+		},
+		{
+			name:   "test_resource_unsubscribe",
+			method: protocol.ResourcesUnsubscribe,
+			request: protocol.UnsubscribeRequest{
+				URI: testResource.URI,
+			},
+			expectedResponse: protocol.UnsubscribeResult{},
 		},
 	}
 

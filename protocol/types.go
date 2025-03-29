@@ -55,6 +55,10 @@ const (
 	RoleAssistant Role = "assistant"
 )
 
+const (
+	PROTOCOL_VERSION = "2024-11-05"
+)
+
 type ClientRequest interface{}
 
 var (
