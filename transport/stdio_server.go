@@ -9,6 +9,8 @@ import (
 	"os"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/bytedance/sonic"
 )
 
 const stdioSessionID = "stdio"
@@ -50,6 +52,29 @@ func NewStdioServerTransport(opts ...StdioServerTransportOption) ServerTransport
 func (t *stdioServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
+
+	// Automatically send initialization request
+	initRequest := protocol.NewJSONRPCRequest("1", protocol.Initialize, &protocol.InitializeRequest{
+		ProtocolVersion: protocol.Version,
+		ClientInfo: protocol.Implementation{
+			Name:    "stdio-client",
+			Version: "1.0.0",
+		},
+		Capabilities: protocol.ClientCapabilities{},
+	})
+	initBytes, _ := sonic.Marshal(initRequest)
+	if err := t.receiver.Receive(ctx, stdioSessionID, initBytes); err != nil {
+		t.logger.Errorf("auto initialize failed: %v", err)
+		return err
+	}
+
+	// Automatically send initialization completion notification
+	initializedNotify := protocol.NewJSONRPCNotification(protocol.NotificationInitialized, nil)
+	initializedBytes, _ := sonic.Marshal(initializedNotify)
+	if err := t.receiver.Receive(ctx, stdioSessionID, initializedBytes); err != nil {
+		t.logger.Errorf("auto initialized failed: %v", err)
+		return err
+	}
 
 	t.receive(ctx)
 
