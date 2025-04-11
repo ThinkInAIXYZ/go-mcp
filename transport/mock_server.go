@@ -61,9 +61,9 @@ func (t *MockServerTransport) Shutdown(userCtx context.Context, serverCtx contex
 		return err
 	}
 
-	<-t.receiveShutDone
-
 	select {
+	case <-t.receiveShutDone:
+		return nil
 	case <-serverCtx.Done():
 		return nil
 	case <-userCtx.Done():
