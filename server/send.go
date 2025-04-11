@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-
 	"github.com/bytedance/sonic"
 
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"

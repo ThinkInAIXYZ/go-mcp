@@ -81,18 +81,21 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 }
 
 func (server *Server) receiveRequest(sessionID string, request *protocol.JSONRPCRequest) error {
-	if request.Method != protocol.Initialize && request.Method != protocol.Ping {
-		if s, ok := server.sessionID2session.Load(sessionID); !ok {
-			return pkg.ErrLackSession
-		} else if !s.ready.Load().(bool) {
-			return pkg.ErrSessionHasNotInitialized
-		}
-	}
-
 	var (
 		result protocol.ServerResponse
 		err    error
 	)
+	ctx := context.Background()
+	if request.Method != protocol.Initialize && request.Method != protocol.Ping {
+		if s, ok := server.sessionID2session.Load(sessionID); !ok {
+			err = pkg.ErrLackSession
+		} else if !s.ready.Load().(bool) {
+			err = pkg.ErrSessionHasNotInitialized
+		}
+	}
+	if err != nil {
+		return server.sendMsgWithError(ctx, sessionID, request.ID, protocol.INTERNAL_ERROR, err.Error())
+	}
 
 	switch request.Method {
 	case protocol.Ping:
@@ -120,8 +123,6 @@ func (server *Server) receiveRequest(sessionID string, request *protocol.JSONRPC
 	default:
 		err = fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, request.Method)
 	}
-
-	ctx := context.Background()
 
 	if err != nil {
 		switch {

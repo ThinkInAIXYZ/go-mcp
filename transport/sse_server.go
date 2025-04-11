@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"github.com/tidwall/gjson"
 	"io"
 	"net/http"
 	"net/url"
@@ -40,6 +41,12 @@ func WithSSEServerTransportOptionURLPrefix(urlPrefix string) SSEServerTransportO
 	}
 }
 
+func WithSSEServerTransportOptionOpenResponse(openResponse bool) SSEServerTransportOption {
+	return func(t *sseServerTransport) {
+		t.openResponse = openResponse
+	}
+}
+
 type SSEServerTransportAndHandlerOption func(*sseServerTransport)
 
 func WithSSEServerTransportAndHandlerOptionLogger(logger pkg.Logger) SSEServerTransportAndHandlerOption {
@@ -68,10 +75,11 @@ type sseServerTransport struct {
 	receiver ServerReceiver
 
 	// options
-	logger      pkg.Logger
-	ssePath     string
-	messagePath string
-	urlPrefix   string
+	logger       pkg.Logger
+	ssePath      string
+	messagePath  string
+	urlPrefix    string
+	openResponse bool
 }
 
 type SSEHandler struct {
@@ -170,7 +178,17 @@ func (t *sseServerTransport) Send(ctx context.Context, sessionID string, msg Mes
 	if !ok {
 		return pkg.ErrLackSession
 	}
-
+	if t.openResponse {
+		if !gjson.GetBytes(msg, "method").Exists() {
+			ch, ok := t.sessionStore.Load(sessionID + "-message")
+			if ok {
+				select {
+				case ch <- msg:
+				default:
+				}
+			}
+		}
+	}
 	select {
 	case ch <- msg:
 		return nil
@@ -204,11 +222,19 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	// Create an SSE connection
 	sessionChan := make(chan []byte, 64)
+
 	sessionID := uuid.New().String()
 	t.sessionStore.Store(sessionID, sessionChan)
 	defer t.sessionStore.Delete(sessionID)
 
+	if t.openResponse {
+		sessionMessageChan := make(chan []byte, 64)
+		t.sessionStore.Store(sessionID+"-message", sessionMessageChan)
+		defer t.sessionStore.Delete(sessionID + "-message")
+	}
+
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointFullURL, sessionID)
+
 	// Send the initial endpoint event
 	_, err := fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", uri)
 	if err != nil {
@@ -281,6 +307,27 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 	// ref: https://github.com/encode/httpx/blob/master/httpx/_status_codes.py#L8
 	// in official httpx, 2xx is success
 	w.WriteHeader(http.StatusAccepted)
+	if t.openResponse {
+		w.Header().Set("Content-Type", "application/json")
+		sessionMessageChan, ok := t.sessionStore.Load(sessionID + "-message")
+		if !ok {
+			t.logger.Warnf("sessionMessageChan not found for sessionID: %s", sessionID)
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg, ok := <-sessionMessageChan:
+				if ok {
+					w.Write(msg)
+				} else {
+					t.logger.Debugf("sessionMessageChan closed for sessionID: %s", sessionID)
+				}
+				return
+			}
+		}
+	}
+
 }
 
 // writeError writes a JSON-RPC error response with the given error details.

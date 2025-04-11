@@ -98,7 +98,7 @@ func getTransport() (t transport.ServerTransport) {
 	} else {
 		addr := fmt.Sprintf("127.0.0.1:%s", port)
 		log.Printf("start current time mcp server with sse transport, listen %s", addr)
-		t, _ = transport.NewSSEServerTransport(addr)
+		t, _ = transport.NewSSEServerTransport(addr, transport.WithSSEServerTransportOptionOpenResponse(true))
 	}
 
 	return t

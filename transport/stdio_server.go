@@ -93,6 +93,10 @@ func (t *stdioServerTransport) receive(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
+			// filter empty messages
+			if s.Text() == "" || s.Text() == " " {
+				continue
+			}
 			if err := t.receiver.Receive(ctx, stdioSessionID, s.Bytes()); err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
 				continue
