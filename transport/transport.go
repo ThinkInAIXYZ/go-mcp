@@ -2,8 +2,6 @@ package transport
 
 import (
 	"context"
-
-	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
 /*
@@ -13,10 +11,6 @@ import (
 
 // Message defines the basic message interface
 type Message []byte
-
-func (msg Message) String() string {
-	return pkg.B2S(msg)
-}
 
 type ClientTransport interface {
 	// Start initiates the transport connection
