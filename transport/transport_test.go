@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"log"
 	"testing"
 	"time"
 
@@ -88,4 +89,55 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		t.Fatalf("server.Send() failed: %v", err)
 	}
 	assert.Equal(t, <-expectedMsgWithClientCh, msgWithClient)
+}
+
+func TestClientReceiverF(t *testing.T) {
+	called := false
+	expectedMsg := []byte("this is a message from ThinkInAI team!")
+
+	receiverFunc := ClientReceiverF(func(ctx context.Context, msg []byte) error {
+		called = true
+		assert.Equal(t, expectedMsg, msg)
+		return nil
+	})
+
+	err := receiverFunc.Receive(context.Background(), expectedMsg)
+	assert.NoError(t, err)
+	assert.True(t, called)
+}
+
+func TestServerReceiverF(t *testing.T) {
+	called := false
+	expectedMsg := []byte("this is a message from ThinkInAI team!")
+	expectedSessionID := "test-session"
+
+	receiverFunc := ServerReceiverF(func(ctx context.Context, sessionID string, msg []byte) error {
+		called = true
+		assert.Equal(t, expectedSessionID, sessionID)
+		assert.Equal(t, expectedMsg, msg)
+		return nil
+	})
+
+	err := receiverFunc.Receive(context.Background(), expectedSessionID, expectedMsg)
+	assert.NoError(t, err)
+	assert.True(t, called)
+}
+
+// testLogger used for test
+type testLogger struct{}
+
+func (t *testLogger) Debugf(format string, a ...any) {
+	log.Printf("[testLogger Debug] "+format+"\n", a...)
+}
+
+func (t *testLogger) Infof(format string, a ...any) {
+	log.Printf("[testLogger Info] "+format+"\n", a...)
+}
+
+func (t *testLogger) Warnf(format string, a ...any) {
+	log.Printf("[testLogger Warn] "+format+"\n", a...)
+}
+
+func (t *testLogger) Errorf(format string, a ...any) {
+	log.Printf("[testLogger Error] "+format+"\n", a...)
 }
