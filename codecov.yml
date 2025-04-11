@@ -1,0 +1,37 @@
+codecov:
+  require_ci_to_pass: true
+  notify:
+    wait_for_ci: true
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        # Adjust based on your expectations - fail if overall project coverage drops more than 1%
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 80%
+    changes: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false  # if true: comment only if coverage changes
+
+# Ignore test files and generated code if applicable
+ignore:
+  - "**/*_test.go"
+  - "**/mock_*.go"
+  - "**/mocks/**"
+  - "**/vendor/**"
+  - "**/testdata/**"
+  - "examples/**"
+
+# GitHub features
+github_checks:
+  annotations: true
