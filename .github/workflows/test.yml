@@ -26,8 +26,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.18,1.22]
-    runs-on: ubuntu-latest
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        go-version: [1.18,1.24]
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Set up Go
         uses: actions/setup-go@v5

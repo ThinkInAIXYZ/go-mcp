@@ -11,8 +11,12 @@ on:
 
 jobs:
   resolve-modules:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
     name: resolve module
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
@@ -24,7 +28,7 @@ jobs:
 
   lint:
     name: lint module
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     needs: resolve-modules
     strategy:
       matrix: ${{ fromJson(needs.resolve-modules.outputs.matrix) }}

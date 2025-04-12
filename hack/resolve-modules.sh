@@ -36,4 +36,18 @@ for mod in $all_modules; do
 	fi
 done
 
-echo "::set-output name=matrix::{\"include\":[${PATHS%?}]}"
+MACHINE_ARCH="$(uname -m)"
+RUNNER=""
+case ${MACHINE_ARCH} in
+  x86_64)
+    RUNNER="ubuntu-latest"
+    ;;
+  arm64)
+    RUNNER="ubuntu-24.04-arm"
+    ;;
+  *)
+    echo "Unsupported architecture $(go env GOARCH)"
+    exit 1
+esac
+
+echo "::set-output name=matrix::{\"include\":[${PATHS%?}],\"runner\":[${RUNNER}]}"
