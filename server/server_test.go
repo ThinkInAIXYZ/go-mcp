@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -226,7 +225,7 @@ func TestServerHandle(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			uuid, _ := uuid.NewUUID()
 			req := protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
-			reqBytes, err := sonic.Marshal(req)
+			reqBytes, err := pkg.JSONMarshal(req)
 			if err != nil {
 				t.Fatalf("json Marshal: %+v", err)
 			}
@@ -458,7 +457,7 @@ func TestServerNotify(t *testing.T) {
 func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.Scanner) {
 	uuid, _ := uuid.NewUUID()
 	req := protocol.NewJSONRPCRequest(uuid, protocol.Initialize, protocol.InitializeRequest{ProtocolVersion: protocol.Version})
-	reqBytes, err := sonic.Marshal(req)
+	reqBytes, err := pkg.JSONMarshal(req)
 	if err != nil {
 		t.Fatalf("json Marshal: %+v", err)
 	}
@@ -498,7 +497,7 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 	}
 
 	notify := protocol.NewJSONRPCNotification(protocol.NotificationInitialized, nil)
-	notifyBytes, err := sonic.Marshal(notify)
+	notifyBytes, err := pkg.JSONMarshal(notify)
 	if err != nil {
 		t.Fatalf("json Marshal: %+v", err)
 	}

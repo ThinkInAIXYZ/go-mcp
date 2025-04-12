@@ -9,8 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bytedance/sonic"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
@@ -192,7 +190,7 @@ func TestClientCall(t *testing.T) {
 					return
 				}
 
-				respBytes, err := sonic.Marshal(protocol.NewJSONRPCSuccessResponse(jsonrpcReq.ID, tt.expectedResponse))
+				respBytes, err := pkg.JSONMarshal(protocol.NewJSONRPCSuccessResponse(jsonrpcReq.ID, tt.expectedResponse))
 				if err != nil {
 					t.Errorf("Json Marshal: %+v", err)
 					return
@@ -285,7 +283,7 @@ func testClientInit(t *testing.T, in io.ReadWriter, out io.ReadWriter, outScan *
 			ProtocolVersion: protocol.Version,
 		}
 
-		respBytes, err := sonic.Marshal(protocol.NewJSONRPCSuccessResponse(jsonrpcReq.ID, resp))
+		respBytes, err := pkg.JSONMarshal(protocol.NewJSONRPCSuccessResponse(jsonrpcReq.ID, resp))
 		if err != nil {
 			t.Errorf("Json Marshal: %+v", err)
 			return

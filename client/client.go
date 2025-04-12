@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/bytedance/sonic"
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -171,7 +170,7 @@ func (client *Client) Close() error {
 }
 
 func defaultNotifyHandler(logger pkg.Logger, notify interface{}) error {
-	b, err := sonic.Marshal(notify)
+	b, err := pkg.JSONMarshal(notify)
 	if err != nil {
 		return err
 	}
