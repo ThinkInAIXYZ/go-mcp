@@ -46,7 +46,8 @@ type ServerTransport interface {
 	// SetReceiver sets the handler for messages from the peer
 	SetReceiver(ServerReceiver)
 
-	// Shutdown gracefully closes, the internal implementation needs to stop receiving messages first, then wait for serverCtx to be canceled, while using userCtx to control timeout.
+	// Shutdown gracefully closes, the internal implementation needs to stop receiving messages first,
+	// then wait for serverCtx to be canceled, while using userCtx to control timeout.
 	// userCtx is used to control the timeout of the server shutdown.
 	// serverCtx is used to coordinate the internal cleanup sequence:
 	// 1. turn off message listen

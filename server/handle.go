@@ -16,7 +16,7 @@ func (server *Server) handleRequestWithPing() (*protocol.PingResult, error) {
 
 func (server *Server) handleRequestWithInitialize(sessionID string, rawParams json.RawMessage) (*protocol.InitializeResult, error) {
 	var request *protocol.InitializeRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -46,13 +46,13 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 
 	var request *protocol.ListPromptsRequest
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 			return nil, err
 		}
 	}
 
 	prompts := make([]protocol.Prompt, 0)
-	server.prompts.Range(func(key string, entry *promptEntry) bool {
+	server.prompts.Range(func(_ string, entry *promptEntry) bool {
 		prompts = append(prompts, *entry.prompt)
 		return true
 	})
@@ -68,7 +68,7 @@ func (server *Server) handleRequestWithGetPrompt(rawParams json.RawMessage) (*pr
 	}
 
 	var request *protocol.GetPromptRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -86,13 +86,13 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 
 	var request *protocol.ListResourcesRequest
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 			return nil, err
 		}
 	}
 
 	resources := make([]protocol.Resource, 0)
-	server.resources.Range(func(key string, entry *resourceEntry) bool {
+	server.resources.Range(func(_ string, entry *resourceEntry) bool {
 		resources = append(resources, *entry.resource)
 		return true
 	})
@@ -109,13 +109,13 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 
 	var request *protocol.ListResourceTemplatesRequest
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 			return nil, err
 		}
 	}
 
 	templates := make([]protocol.ResourceTemplate, 0)
-	server.resourceTemplates.Range(func(key string, entry *resourceTemplateEntry) bool {
+	server.resourceTemplates.Range(func(_ string, entry *resourceTemplateEntry) bool {
 		templates = append(templates, *entry.resourceTemplate)
 		return true
 	})
@@ -131,7 +131,7 @@ func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (
 	}
 
 	var request *protocol.ReadResourceRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -140,7 +140,7 @@ func (server *Server) handleRequestWithReadResource(rawParams json.RawMessage) (
 		handler = entry.handler
 	}
 
-	server.resourceTemplates.Range(func(key string, entry *resourceTemplateEntry) bool {
+	server.resourceTemplates.Range(func(_ string, entry *resourceTemplateEntry) bool {
 		if !matchesTemplate(request.URI, entry.resourceTemplate.URITemplateParsed) {
 			return true
 		}
@@ -169,7 +169,7 @@ func (server *Server) handleRequestWithSubscribeResourceChange(sessionID string,
 	}
 
 	var request *protocol.SubscribeRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -187,7 +187,7 @@ func (server *Server) handleRequestWithUnSubscribeResourceChange(sessionID strin
 	}
 
 	var request *protocol.UnsubscribeRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -206,13 +206,13 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 
 	request := &protocol.ListToolsRequest{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 			return nil, err
 		}
 	}
 
 	tools := make([]*protocol.Tool, 0)
-	server.tools.Range(func(key string, entry *toolEntry) bool {
+	server.tools.Range(func(_ string, entry *toolEntry) bool {
 		tools = append(tools, entry.tool)
 		return true
 	})
@@ -226,7 +226,7 @@ func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*pro
 	}
 
 	var request *protocol.CallToolRequest
-	if err := pkg.JsonUnmarshal(rawParams, &request); err != nil {
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
 		return nil, err
 	}
 
@@ -241,7 +241,7 @@ func (server *Server) handleRequestWithCallTool(rawParams json.RawMessage) (*pro
 func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams json.RawMessage) error {
 	param := &protocol.InitializedNotification{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, param); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, param); err != nil {
 			return err
 		}
 	}

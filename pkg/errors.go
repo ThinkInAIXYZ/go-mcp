@@ -11,7 +11,7 @@ var (
 	ErrLackResponseChan          = errors.New("lack response chan")
 	ErrDuplicateResponseReceived = errors.New("duplicate response received")
 	ErrMethodNotSupport          = errors.New("method not support")
-	ErrJsonUnmarshal             = errors.New("json unmarshal error")
+	ErrJSONUnmarshal             = errors.New("json unmarshal error")
 	ErrSessionHasNotInitialized  = errors.New("the session has not been initialized")
 	ErrLackSession               = errors.New("lack session")
 )

@@ -15,7 +15,7 @@ func (client *Client) handleRequestWithPing() (*protocol.PingResult, error) {
 func (client *Client) handleNotifyWithToolsListChanged(ctx context.Context, rawParams json.RawMessage) error {
 	notify := &protocol.ToolListChangedNotification{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, notify); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, notify); err != nil {
 			return err
 		}
 	}
@@ -25,7 +25,7 @@ func (client *Client) handleNotifyWithToolsListChanged(ctx context.Context, rawP
 func (client *Client) handleNotifyWithPromptsListChanged(ctx context.Context, rawParams json.RawMessage) error {
 	notify := &protocol.PromptListChangedNotification{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, notify); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, notify); err != nil {
 			return err
 		}
 	}
@@ -35,7 +35,7 @@ func (client *Client) handleNotifyWithPromptsListChanged(ctx context.Context, ra
 func (client *Client) handleNotifyWithResourcesListChanged(ctx context.Context, rawParams json.RawMessage) error {
 	notify := &protocol.ResourceListChangedNotification{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, notify); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, notify); err != nil {
 			return err
 		}
 	}
@@ -45,7 +45,7 @@ func (client *Client) handleNotifyWithResourcesListChanged(ctx context.Context, 
 func (client *Client) handleNotifyWithResourcesUpdated(ctx context.Context, rawParams json.RawMessage) error {
 	notify := &protocol.ResourceUpdatedNotification{}
 	if len(rawParams) > 0 {
-		if err := pkg.JsonUnmarshal(rawParams, notify); err != nil {
+		if err := pkg.JSONUnmarshal(rawParams, notify); err != nil {
 			return err
 		}
 	}

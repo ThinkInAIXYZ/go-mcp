@@ -126,7 +126,7 @@ func (server *Server) Run() error {
 			}
 			return nil
 		case <-ticker.C:
-			server.sessionID2session.Range(func(key string, value *session) bool {
+			server.sessionID2session.Range(func(key string, _ *session) bool {
 				if server.inShutdown.Load().(bool) {
 					return false
 				}

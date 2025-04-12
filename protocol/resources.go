@@ -51,7 +51,7 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	}{
 		Alias: (*Alias)(r),
 	}
-	if err := pkg.JsonUnmarshal(data, &aux); err != nil {
+	if err := pkg.JSONUnmarshal(data, &aux); err != nil {
 		return err
 	}
 
@@ -59,14 +59,14 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	for i, content := range aux.Contents {
 		// Try to unmarshal content as TextResourceContents first
 		var textContent TextResourceContents
-		if err := pkg.JsonUnmarshal(content, &textContent); err == nil {
+		if err := pkg.JSONUnmarshal(content, &textContent); err == nil {
 			r.Contents[i] = textContent
 			continue
 		}
 
 		// Try to unmarshal content as BlobResourceContents
 		var blobContent BlobResourceContents
-		if err := pkg.JsonUnmarshal(content, &blobContent); err == nil {
+		if err := pkg.JSONUnmarshal(content, &blobContent); err == nil {
 			r.Contents[i] = blobContent
 			continue
 		}
@@ -84,7 +84,9 @@ type Resource struct {
 	Name string `json:"name"`
 	// URI The URI of this resource.
 	URI string `json:"uri"`
-	// Description A description of what this resource represents. This can be used by clients to improve the LLM's understanding of available resources. It can be thought of like a "hint" to the model.
+	// Description A description of what this resource represents.
+	// This can be used by clients to improve the LLM's understanding of available resources.
+	// It can be thought of like a "hint" to the model.
 	Description string `json:"description,omitempty"`
 	// MimeType The MIME type of this resource, if known.
 	MimeType string `json:"mimeType,omitempty"`

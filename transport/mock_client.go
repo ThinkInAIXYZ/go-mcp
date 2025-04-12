@@ -42,7 +42,7 @@ func (t *MockClientTransport) Start() error {
 	return nil
 }
 
-func (t *MockClientTransport) Send(ctx context.Context, msg Message) error {
+func (t *MockClientTransport) Send(_ context.Context, msg Message) error {
 	if _, err := t.out.Write(append(msg, mcpMessageDelimiter)); err != nil {
 		return fmt.Errorf("failed to write: %w", err)
 	}

@@ -24,14 +24,14 @@ func (r clientReceive) Receive(ctx context.Context, msg []byte) error {
 func testTransport(t *testing.T, client ClientTransport, server ServerTransport) {
 	msgWithServer := "hello"
 	expectedMsgWithServerCh := make(chan string, 1)
-	server.SetReceiver(serverReceive(func(ctx context.Context, sessionID string, msg []byte) error {
+	server.SetReceiver(serverReceive(func(_ context.Context, _ string, msg []byte) error {
 		expectedMsgWithServerCh <- string(msg)
 		return nil
 	}))
 
 	msgWithClient := "hello"
 	expectedMsgWithClientCh := make(chan string, 1)
-	client.SetReceiver(clientReceive(func(ctx context.Context, msg []byte) error {
+	client.SetReceiver(clientReceive(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
 		return nil
 	}))

@@ -9,7 +9,9 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
-func (server *Server) sendMsgWithRequest(ctx context.Context, sessionID string, requestID protocol.RequestID, method protocol.Method, params protocol.ServerRequest) error {
+func (server *Server) sendMsgWithRequest(ctx context.Context, sessionID string, requestID protocol.RequestID,
+	method protocol.Method, params protocol.ServerRequest,
+) error { //nolint:whitespace
 	if requestID == nil {
 		return fmt.Errorf("requestID can't is nil")
 	}

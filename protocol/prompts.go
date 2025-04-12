@@ -55,27 +55,27 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 	}{
 		Alias: (*Alias)(m),
 	}
-	if err := pkg.JsonUnmarshal(data, &aux); err != nil {
+	if err := pkg.JSONUnmarshal(data, &aux); err != nil {
 		return err
 	}
 
 	// Try to unmarshal content as TextContent first
 	var textContent TextContent
-	if err := pkg.JsonUnmarshal(aux.Content, &textContent); err == nil {
+	if err := pkg.JSONUnmarshal(aux.Content, &textContent); err == nil {
 		m.Content = textContent
 		return nil
 	}
 
 	// Try to unmarshal content as ImageContent
 	var imageContent ImageContent
-	if err := pkg.JsonUnmarshal(aux.Content, &imageContent); err == nil {
+	if err := pkg.JSONUnmarshal(aux.Content, &imageContent); err == nil {
 		m.Content = imageContent
 		return nil
 	}
 
 	// Try to unmarshal content as embeddedResource
 	var embeddedResource EmbeddedResource
-	if err := pkg.JsonUnmarshal(aux.Content, &embeddedResource); err == nil {
+	if err := pkg.JSONUnmarshal(aux.Content, &embeddedResource); err == nil {
 		m.Content = embeddedResource
 		return nil
 	}

@@ -23,7 +23,7 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 	}
 
 	var result protocol.PingResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -35,7 +35,7 @@ func (server *Server) sendNotification4ToolListChanges(ctx context.Context) erro
 	}
 
 	var errList []error
-	server.sessionID2session.Range(func(sessionID string, value *session) bool {
+	server.sessionID2session.Range(func(sessionID string, _ *session) bool {
 		if err := server.sendMsgWithNotification(ctx, sessionID, protocol.NotificationToolsListChanged, protocol.NewToolListChangedNotification()); err != nil {
 			errList = append(errList, fmt.Errorf("sessionID=%s, err: %w", sessionID, err))
 		}
@@ -50,7 +50,7 @@ func (server *Server) sendNotification4PromptListChanges(ctx context.Context) er
 	}
 
 	var errList []error
-	server.sessionID2session.Range(func(sessionID string, value *session) bool {
+	server.sessionID2session.Range(func(sessionID string, _ *session) bool {
 		if err := server.sendMsgWithNotification(ctx, sessionID, protocol.NotificationPromptsListChanged, protocol.NewPromptListChangedNotification()); err != nil {
 			errList = append(errList, fmt.Errorf("sessionID=%s, err: %w", sessionID, err))
 		}
@@ -65,8 +65,9 @@ func (server *Server) sendNotification4ResourceListChanges(ctx context.Context) 
 	}
 
 	var errList []error
-	server.sessionID2session.Range(func(sessionID string, value *session) bool {
-		if err := server.sendMsgWithNotification(ctx, sessionID, protocol.NotificationResourcesListChanged, protocol.NewResourceListChangedNotification()); err != nil {
+	server.sessionID2session.Range(func(sessionID string, _ *session) bool {
+		if err := server.sendMsgWithNotification(ctx, sessionID, protocol.NotificationResourcesListChanged,
+			protocol.NewResourceListChangedNotification()); err != nil {
 			errList = append(errList, fmt.Errorf("sessionID=%s, err: %w", sessionID, err))
 		}
 		return true

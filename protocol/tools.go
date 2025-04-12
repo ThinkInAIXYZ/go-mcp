@@ -79,14 +79,14 @@ func (r *CallToolRequest) UnmarshalJSON(data []byte) error {
 		alias: (*alias)(r),
 	}
 
-	if err := pkg.JsonUnmarshal(data, temp); err != nil {
+	if err := pkg.JSONUnmarshal(data, temp); err != nil {
 		return err
 	}
 
 	r.RawArguments = temp.Arguments
 
 	if len(r.RawArguments) != 0 {
-		if err := pkg.JsonUnmarshal(r.RawArguments, &r.Arguments); err != nil {
+		if err := pkg.JSONUnmarshal(r.RawArguments, &r.Arguments); err != nil {
 			return err
 		}
 	}
@@ -109,7 +109,7 @@ func (r *CallToolResult) UnmarshalJSON(data []byte) error {
 	}{
 		Alias: (*Alias)(r),
 	}
-	if err := pkg.JsonUnmarshal(data, &aux); err != nil {
+	if err := pkg.JSONUnmarshal(data, &aux); err != nil {
 		return err
 	}
 
@@ -117,21 +117,21 @@ func (r *CallToolResult) UnmarshalJSON(data []byte) error {
 	for i, content := range aux.Content {
 		// Try to unmarshal content as TextContent first
 		var textContent TextContent
-		if err := pkg.JsonUnmarshal(content, &textContent); err == nil {
+		if err := pkg.JSONUnmarshal(content, &textContent); err == nil {
 			r.Content[i] = textContent
 			continue
 		}
 
 		// Try to unmarshal content as ImageContent
 		var imageContent ImageContent
-		if err := pkg.JsonUnmarshal(content, &imageContent); err == nil {
+		if err := pkg.JSONUnmarshal(content, &imageContent); err == nil {
 			r.Content[i] = imageContent
 			continue
 		}
 
 		// Try to unmarshal content as embeddedResource
 		var embeddedResource EmbeddedResource
-		if err := pkg.JsonUnmarshal(content, &embeddedResource); err == nil {
+		if err := pkg.JSONUnmarshal(content, &embeddedResource); err == nil {
 			r.Content[i] = embeddedResource
 			return nil
 		}

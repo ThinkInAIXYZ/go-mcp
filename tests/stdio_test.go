@@ -14,7 +14,7 @@ func TestStdio(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func(name string) {
-		if err := os.Remove(name); err != nil {
+		if err = os.Remove(name); err != nil {
 			fmt.Printf("Failed to remove mock server: %v\n", err)
 		}
 	}(mockServerTrPath)

@@ -127,8 +127,11 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 	return t, nil
 }
 
-// NewSSEServerTransportAndHandler returns a transport without starting the HTTP server, and returns a Handler for users to start their own HTTP server externally
-func NewSSEServerTransportAndHandler(messageEndpointFullURL string, opts ...SSEServerTransportAndHandlerOption) (ServerTransport, *SSEHandler, error) {
+// NewSSEServerTransportAndHandler returns a transport without starting the HTTP server,
+// and returns a Handler for users to start their own HTTP server externally
+func NewSSEServerTransportAndHandler(messageEndpointFullURL string,
+	opts ...SSEServerTransportAndHandlerOption,
+) (ServerTransport, *SSEHandler, error) { //nolint:whitespace
 	ctx, cancel := context.WithCancel(context.Background())
 
 	t := &sseServerTransport{
@@ -242,7 +245,7 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 // handleMessage processes incoming JSON-RPC messages from clients and sends responses
 // back through both the SSE connection and HTTP response.
 func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Request) {
-	defer pkg.RecoverWithFunc(func(r any) {
+	defer pkg.RecoverWithFunc(func(_ any) {
 		t.writeError(w, http.StatusInternalServerError, "Internal server error")
 	})
 
@@ -301,7 +304,7 @@ func (t *sseServerTransport) Shutdown(userCtx context.Context, serverCtx context
 
 		t.inFlySend.Wait()
 
-		t.sessionStore.Range(func(key string, ch chan []byte) bool {
+		t.sessionStore.Range(func(_ string, ch chan []byte) bool {
 			close(ch)
 			return true
 		})

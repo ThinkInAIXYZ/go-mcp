@@ -87,7 +87,7 @@ func (t *stdioClientTransport) Start() error {
 	return nil
 }
 
-func (t *stdioClientTransport) Send(ctx context.Context, msg Message) error {
+func (t *stdioClientTransport) Send(_ context.Context, msg Message) error {
 	_, err := t.writer.Write(append(msg, mcpMessageDelimiter))
 	return err
 }

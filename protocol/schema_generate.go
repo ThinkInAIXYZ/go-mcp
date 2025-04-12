@@ -86,7 +86,7 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 		if jsonTag == "-" {
 			continue
 		}
-		var required = true
+		required := true
 		if jsonTag == "" {
 			jsonTag = field.Name
 		}

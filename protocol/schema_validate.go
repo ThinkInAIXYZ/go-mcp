@@ -13,7 +13,7 @@ func VerifyAndUnmarshal(content json.RawMessage, v any) error {
 	t := reflect.TypeOf(v)
 	for t.Kind() != reflect.Struct {
 		if t.Kind() != reflect.Ptr {
-			return fmt.Errorf("invalid type %v, plz use func `pkg.JsonUnmarshal` instead", t)
+			return fmt.Errorf("invalid type %v, plz use func `pkg.JSONUnmarshal` instead", t)
 		}
 		t = t.Elem()
 	}
@@ -21,7 +21,7 @@ func VerifyAndUnmarshal(content json.RawMessage, v any) error {
 	typeUID := getTypeUUID(t)
 	schema, ok := schemaCache.Load(typeUID)
 	if !ok {
-		return fmt.Errorf("schema has not been generated，unable to verify: plz use func `pkg.JsonUnmarshal` instead")
+		return fmt.Errorf("schema has not been generated，unable to verify: plz use func `pkg.JSONUnmarshal` instead")
 	}
 
 	return VerifySchemaAndUnmarshal(Property{
@@ -33,14 +33,14 @@ func VerifyAndUnmarshal(content json.RawMessage, v any) error {
 
 func VerifySchemaAndUnmarshal(schema Property, content []byte, v any) error {
 	var data any
-	err := pkg.JsonUnmarshal(content, &data)
+	err := pkg.JSONUnmarshal(content, &data)
 	if err != nil {
 		return err
 	}
 	if !Validate(schema, data) {
 		return errors.New("data validation failed against the provided schema")
 	}
-	return pkg.JsonUnmarshal(content, &v)
+	return pkg.JSONUnmarshal(content, &v)
 }
 
 func Validate(schema Property, data any) bool {

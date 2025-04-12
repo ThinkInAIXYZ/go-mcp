@@ -19,7 +19,7 @@ func (client *Client) initialization(ctx context.Context, request *protocol.Init
 		return nil, err
 	}
 	var result protocol.InitializeResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
@@ -49,7 +49,7 @@ func (client *Client) Ping(ctx context.Context, request *protocol.PingRequest) (
 	}
 
 	var result protocol.PingResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -66,7 +66,7 @@ func (client *Client) ListPrompts(ctx context.Context) (*protocol.ListPromptsRes
 	}
 
 	var result protocol.ListPromptsResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -83,7 +83,7 @@ func (client *Client) GetPrompt(ctx context.Context, request *protocol.GetPrompt
 	}
 
 	var result protocol.GetPromptResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
@@ -101,7 +101,7 @@ func (client *Client) ListResources(ctx context.Context) (*protocol.ListResource
 	}
 
 	var result protocol.ListResourcesResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, err
@@ -118,7 +118,7 @@ func (client *Client) ListResourceTemplates(ctx context.Context) (*protocol.List
 	}
 
 	var result protocol.ListResourceTemplatesResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -135,7 +135,7 @@ func (client *Client) ReadResource(ctx context.Context, request *protocol.ReadRe
 	}
 
 	var result protocol.ReadResourceResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -153,7 +153,7 @@ func (client *Client) SubscribeResourceChange(ctx context.Context, request *prot
 
 	var result protocol.SubscribeResult
 	if len(response) > 0 {
-		if err = pkg.JsonUnmarshal(response, &result); err != nil {
+		if err = pkg.JSONUnmarshal(response, &result); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 		}
 	}
@@ -172,7 +172,7 @@ func (client *Client) UnSubscribeResourceChange(ctx context.Context, request *pr
 
 	var result protocol.UnsubscribeResult
 	if len(response) > 0 {
-		if err = pkg.JsonUnmarshal(response, &result); err != nil {
+		if err = pkg.JSONUnmarshal(response, &result); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 		}
 	}
@@ -190,7 +190,7 @@ func (client *Client) ListTools(ctx context.Context) (*protocol.ListToolsResult,
 	}
 
 	var result protocol.ListToolsResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
@@ -207,7 +207,7 @@ func (client *Client) CallTool(ctx context.Context, request *protocol.CallToolRe
 	}
 
 	var result protocol.CallToolResult
-	if err := pkg.JsonUnmarshal(response, &result); err != nil {
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil

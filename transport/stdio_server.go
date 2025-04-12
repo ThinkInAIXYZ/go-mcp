@@ -57,7 +57,7 @@ func (t *stdioServerTransport) Run() error {
 	return nil
 }
 
-func (t *stdioServerTransport) Send(ctx context.Context, sessionID string, msg Message) error {
+func (t *stdioServerTransport) Send(_ context.Context, _ string, msg Message) error {
 	if _, err := t.writer.Write(append(msg, mcpMessageDelimiter)); err != nil {
 		return fmt.Errorf("failed to write: %w", err)
 	}

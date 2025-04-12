@@ -10,11 +10,16 @@ const jsonrpcVersion = "2.0"
 
 // Standard JSON-RPC error codes
 const (
-	PARSE_ERROR      = -32700 // Invalid JSON
-	INVALID_REQUEST  = -32600 // The JSON sent is not a valid Request object
+	//nolint:revive
+	PARSE_ERROR = -32700 // Invalid JSON
+	//nolint:revive
+	INVALID_REQUEST = -32600 // The JSON sent is not a valid Request object
+	//nolint:revive
 	METHOD_NOT_FOUND = -32601 // The method does not exist / is not available
-	INVALID_PARAMS   = -32602 // Invalid method parameter(s)
-	INTERNAL_ERROR   = -32603 // Internal JSON-RPC error
+	//nolint:revive
+	INVALID_PARAMS = -32602 // Invalid method parameter(s)
+	//nolint:revive
+	INTERNAL_ERROR = -32603 // Internal JSON-RPC error
 
 	// 可以定义自己的错误代码，范围在-32000 以上。
 )
@@ -38,14 +43,14 @@ func (r *JSONRPCRequest) UnmarshalJSON(data []byte) error {
 		alias: (*alias)(r),
 	}
 
-	if err := pkg.JsonUnmarshal(data, temp); err != nil {
+	if err := pkg.JSONUnmarshal(data, temp); err != nil {
 		return err
 	}
 
 	r.RawParams = temp.Params
 
 	if len(r.RawParams) != 0 {
-		if err := pkg.JsonUnmarshal(r.RawParams, &r.Params); err != nil {
+		if err := pkg.JSONUnmarshal(r.RawParams, &r.Params); err != nil {
 			return err
 		}
 	}
@@ -87,14 +92,14 @@ func (r *JSONRPCResponse) UnmarshalJSON(data []byte) error {
 		alias: (*alias)(r),
 	}
 
-	if err := pkg.JsonUnmarshal(data, temp); err != nil {
+	if err := pkg.JSONUnmarshal(data, temp); err != nil {
 		return err
 	}
 
 	r.RawResult = temp.Result
 
 	if len(r.RawResult) != 0 {
-		if err := pkg.JsonUnmarshal(r.RawResult, &r.Result); err != nil {
+		if err := pkg.JSONUnmarshal(r.RawResult, &r.Result); err != nil {
 			return err
 		}
 	}
@@ -118,14 +123,14 @@ func (r *JSONRPCNotification) UnmarshalJSON(data []byte) error {
 		alias: (*alias)(r),
 	}
 
-	if err := pkg.JsonUnmarshal(data, temp); err != nil {
+	if err := pkg.JSONUnmarshal(data, temp); err != nil {
 		return err
 	}
 
 	r.RawParams = temp.Params
 
 	if len(r.RawParams) != 0 {
-		if err := pkg.JsonUnmarshal(r.RawParams, &r.Params); err != nil {
+		if err := pkg.JSONUnmarshal(r.RawParams, &r.Params); err != nil {
 			return err
 		}
 	}

@@ -101,25 +101,25 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 	}
 
 	if client.notifyHandlerWithToolsListChanged == nil {
-		client.notifyHandlerWithToolsListChanged = func(ctx context.Context, notify *protocol.ToolListChangedNotification) error {
+		client.notifyHandlerWithToolsListChanged = func(_ context.Context, notify *protocol.ToolListChangedNotification) error {
 			return defaultNotifyHandler(client.logger, notify)
 		}
 	}
 
 	if client.notifyHandlerWithPromptListChanged == nil {
-		client.notifyHandlerWithPromptListChanged = func(ctx context.Context, notify *protocol.PromptListChangedNotification) error {
+		client.notifyHandlerWithPromptListChanged = func(_ context.Context, notify *protocol.PromptListChangedNotification) error {
 			return defaultNotifyHandler(client.logger, notify)
 		}
 	}
 
 	if client.notifyHandlerWithResourceListChanged == nil {
-		client.notifyHandlerWithResourceListChanged = func(ctx context.Context, notify *protocol.ResourceListChangedNotification) error {
+		client.notifyHandlerWithResourceListChanged = func(_ context.Context, notify *protocol.ResourceListChangedNotification) error {
 			return defaultNotifyHandler(client.logger, notify)
 		}
 	}
 
 	if client.notifyHandlerWithResourcesUpdated == nil {
-		client.notifyHandlerWithResourcesUpdated = func(ctx context.Context, notify *protocol.ResourceUpdatedNotification) error {
+		client.notifyHandlerWithResourcesUpdated = func(_ context.Context, notify *protocol.ResourceUpdatedNotification) error {
 			return defaultNotifyHandler(client.logger, notify)
 		}
 	}

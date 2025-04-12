@@ -41,7 +41,7 @@ func (m *SyncMap[V]) Store(key string, value V) {
 
 func (m *SyncMap[V]) IsEmpty() bool {
 	isEmpty := true
-	m.m.Range(func(key, value any) bool {
+	m.m.Range(func(_, _ any) bool {
 		isEmpty = false
 		return false
 	})

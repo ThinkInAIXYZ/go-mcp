@@ -58,7 +58,7 @@ func TestClientCall(t *testing.T) {
 		},
 		{
 			name: "test_list_prompts",
-			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
+			f: func(client *Client, _ protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.ListPrompts(context.Background())
 			},
 			request:          protocol.NewListPromptsRequest(),
@@ -69,12 +69,17 @@ func TestClientCall(t *testing.T) {
 			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.GetPrompt(context.Background(), request.(*protocol.GetPromptRequest))
 			},
-			request:          protocol.NewGetPromptRequest("prompt1", map[string]string{}),
-			expectedResponse: protocol.NewGetPromptResult([]protocol.PromptMessage{{Role: protocol.RoleUser, Content: protocol.TextContent{Type: "text", Text: "prompt content"}}}, "test description"),
+			request: protocol.NewGetPromptRequest("prompt1", map[string]string{}),
+			expectedResponse: protocol.NewGetPromptResult([]protocol.PromptMessage{
+				{
+					Role:    protocol.RoleUser,
+					Content: protocol.TextContent{Type: "text", Text: "prompt content"},
+				},
+			}, "test description"),
 		},
 		{
 			name: "test_list_resources",
-			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
+			f: func(client *Client, _ protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.ListResources(context.Background())
 			},
 			request:          protocol.NewListResourcesRequest(),
@@ -85,12 +90,14 @@ func TestClientCall(t *testing.T) {
 			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.ReadResource(context.Background(), request.(*protocol.ReadResourceRequest))
 			},
-			request:          protocol.NewReadResourceRequest("resource1"),
-			expectedResponse: protocol.NewReadResourceResult([]protocol.ResourceContents{protocol.TextResourceContents{URI: "resource1", Text: "resource content", MimeType: "text/plain"}}),
+			request: protocol.NewReadResourceRequest("resource1"),
+			expectedResponse: protocol.NewReadResourceResult([]protocol.ResourceContents{
+				protocol.TextResourceContents{URI: "resource1", Text: "resource content", MimeType: "text/plain"},
+			}),
 		},
 		{
 			name: "test_list_resource_templates",
-			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
+			f: func(client *Client, _ protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.ListResourceTemplates(context.Background())
 			},
 			request:          protocol.NewListResourceTemplatesRequest(),
@@ -114,7 +121,7 @@ func TestClientCall(t *testing.T) {
 		},
 		{
 			name: "test_list_tool",
-			f: func(client *Client, request protocol.ClientRequest) (protocol.ServerResponse, error) {
+			f: func(client *Client, _ protocol.ClientRequest) (protocol.ServerResponse, error) {
 				return client.ListTools(context.Background())
 			},
 			request: protocol.NewListToolsRequest(),
@@ -158,13 +165,13 @@ func TestClientCall(t *testing.T) {
 				}
 
 				jsonrpcReq := &protocol.JSONRPCRequest{}
-				if err := pkg.JsonUnmarshal(reqBytes, &jsonrpcReq); err != nil {
+				if err := pkg.JSONUnmarshal(reqBytes, &jsonrpcReq); err != nil {
 					t.Errorf("Json Unmarshal: %+v", err)
 					return
 				}
 
 				request := make(map[string]interface{})
-				if err := pkg.JsonUnmarshal(jsonrpcReq.RawParams, &request); err != nil {
+				if err := pkg.JSONUnmarshal(jsonrpcReq.RawParams, &request); err != nil {
 					t.Errorf("Json Unmarshal: %+v", err)
 					return
 				}
@@ -175,7 +182,7 @@ func TestClientCall(t *testing.T) {
 					return
 				}
 				var expectedReqMap map[string]interface{}
-				if err := pkg.JsonUnmarshal(expectedReqBytes, &expectedReqMap); err != nil {
+				if err = pkg.JSONUnmarshal(expectedReqBytes, &expectedReqMap); err != nil {
 					t.Errorf("json Unmarshal: %+v", err)
 					return
 				}
@@ -231,13 +238,13 @@ func testClientInit(t *testing.T, in io.ReadWriter, out io.ReadWriter, outScan *
 		}
 
 		jsonrpcReq := &protocol.JSONRPCRequest{}
-		if err := pkg.JsonUnmarshal(reqBytes, &jsonrpcReq); err != nil {
+		if err := pkg.JSONUnmarshal(reqBytes, &jsonrpcReq); err != nil {
 			t.Errorf("Json Unmarshal: %+v", err)
 			return
 		}
 
 		request := make(map[string]interface{})
-		if err := pkg.JsonUnmarshal(jsonrpcReq.RawParams, &request); err != nil {
+		if err := pkg.JSONUnmarshal(jsonrpcReq.RawParams, &request); err != nil {
 			t.Errorf("Json Unmarshal: %+v", err)
 			return
 		}
@@ -248,7 +255,7 @@ func testClientInit(t *testing.T, in io.ReadWriter, out io.ReadWriter, outScan *
 			return
 		}
 		var expectedReqMap map[string]interface{}
-		if err := pkg.JsonUnmarshal(expectedReqBytes, &expectedReqMap); err != nil {
+		if err = pkg.JSONUnmarshal(expectedReqBytes, &expectedReqMap); err != nil {
 			t.Errorf("json Unmarshal: %+v", err)
 			return
 		}

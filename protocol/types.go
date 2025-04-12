@@ -46,7 +46,7 @@ const (
 
 	// progress related methods
 	NotificationProgress  Method = "notifications/progress"
-	NotificationCancelled Method = "notifications/cancelled"
+	NotificationCancelled Method = "notifications/canceled"
 )
 
 // Role represents the sender or recipient of messages and data in a conversation

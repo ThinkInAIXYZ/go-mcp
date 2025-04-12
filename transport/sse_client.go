@@ -73,41 +73,41 @@ func NewSSEClientTransport(serverURL string, opts ...SSEClientTransportOption) (
 }
 
 func (t *sseClientTransport) Start() error {
-	var (
-		err  error
-		req  *http.Request
-		resp *http.Response
-	)
-
-	req, err = http.NewRequest(http.MethodGet, t.serverURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("Connection", "keep-alive")
-
-	if resp, err = t.client.Do(req); err != nil {
-		return fmt.Errorf("failed to connect to SSE stream: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		_ = resp.Body.Close()
-		return fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
-	}
-
+	errChan := make(chan error, 1)
 	go func() {
 		defer pkg.Recover()
+
+		req, err := http.NewRequest(http.MethodGet, t.serverURL, nil)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to create request: %w", err)
+			return
+		}
+
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set("Cache-Control", "no-cache")
+		req.Header.Set("Connection", "keep-alive")
+
+		resp, err := t.client.Do(req)
+		if err != nil {
+			errChan <- fmt.Errorf("failed to connect to SSE stream: %w", err)
+			return
+		}
+		defer resp.Body.Close() // Move the defer inside the goroutine
+
+		if resp.StatusCode != http.StatusOK {
+			errChan <- fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
+			return
+		}
 
 		t.readSSE(resp.Body)
 	}()
 
 	// Wait for the endpoint to be received
-
 	select {
 	case <-t.endpointChan:
-		// Endpoint received, proceed
+	// Endpoint received, proceed
+	case err := <-errChan:
+		return fmt.Errorf("error in SSE stream: %w", err)
 	case <-time.After(10 * time.Second): // Add a timeout
 		return fmt.Errorf("timeout waiting for endpoint")
 	}
@@ -206,6 +206,7 @@ func (t *sseClientTransport) Send(ctx context.Context, msg Message) error {
 	if resp, err = t.client.Do(req); err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)

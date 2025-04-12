@@ -11,12 +11,12 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
-func (client *Client) receive(ctx context.Context, msg []byte) error {
+func (client *Client) receive(_ context.Context, msg []byte) error {
 	defer pkg.Recover()
 
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
-		if err := pkg.JsonUnmarshal(msg, &notify); err != nil {
+		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {
 			return err
 		}
 		go func() {
@@ -34,7 +34,7 @@ func (client *Client) receive(ctx context.Context, msg []byte) error {
 	// Determine if it's a request or response
 	if !gjson.GetBytes(msg, "method").Exists() {
 		resp := &protocol.JSONRPCResponse{}
-		if err := pkg.JsonUnmarshal(msg, &resp); err != nil {
+		if err := pkg.JSONUnmarshal(msg, &resp); err != nil {
 			return err
 		}
 		go func() {
@@ -50,7 +50,7 @@ func (client *Client) receive(ctx context.Context, msg []byte) error {
 	}
 
 	req := &protocol.JSONRPCRequest{}
-	if err := pkg.JsonUnmarshal(msg, &req); err != nil {
+	if err := pkg.JSONUnmarshal(msg, &req); err != nil {
 		return err
 	}
 	if !req.IsValid() {
@@ -91,7 +91,7 @@ func (client *Client) receiveRequest(ctx context.Context, request *protocol.JSON
 			return client.sendMsgWithError(ctx, request.ID, protocol.METHOD_NOT_FOUND, err.Error())
 		case errors.Is(err, pkg.ErrRequestInvalid):
 			return client.sendMsgWithError(ctx, request.ID, protocol.INVALID_REQUEST, err.Error())
-		case errors.Is(err, pkg.ErrJsonUnmarshal):
+		case errors.Is(err, pkg.ErrJSONUnmarshal):
 			return client.sendMsgWithError(ctx, request.ID, protocol.PARSE_ERROR, err.Error())
 		default:
 			return client.sendMsgWithError(ctx, request.ID, protocol.INTERNAL_ERROR, err.Error())

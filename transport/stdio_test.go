@@ -49,7 +49,7 @@ func TestStdioTransport(t *testing.T) {
 	)
 
 	mockServerTrPath := filepath.Join(os.TempDir(), "mock_server_tr_"+strconv.Itoa(rand.Int()))
-	if err := compileMockStdioServerTr(mockServerTrPath); err != nil {
+	if err = compileMockStdioServerTr(mockServerTrPath); err != nil {
 		t.Fatalf("Failed to compile mock server: %v", err)
 	}
 

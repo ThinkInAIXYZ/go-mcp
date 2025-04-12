@@ -8,9 +8,9 @@ import (
 
 var sonicAPI = sonic.Config{UseInt64: true}.Froze() // Effectively prevents integer overflow
 
-func JsonUnmarshal(data []byte, v interface{}) error {
+func JSONUnmarshal(data []byte, v interface{}) error {
 	if err := sonicAPI.Unmarshal(data, v); err != nil {
-		return fmt.Errorf("%w: data=%s, error: %+v", ErrJsonUnmarshal, data, err)
+		return fmt.Errorf("%w: data=%s, error: %+v", ErrJSONUnmarshal, data, err)
 	}
 	return nil
 }

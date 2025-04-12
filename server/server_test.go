@@ -64,7 +64,7 @@ func TestServerHandle(t *testing.T) {
 		Type: "text",
 		Text: "pong",
 	}
-	server.RegisterTool(testTool, func(ctr *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	server.RegisterTool(testTool, func(_ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 		return &protocol.CallToolResult{
 			Content: []protocol.Content{testToolCallContent},
 		}, nil
@@ -230,7 +230,7 @@ func TestServerHandle(t *testing.T) {
 			if err != nil {
 				t.Fatalf("json Marshal: %+v", err)
 			}
-			if _, err := in.writer.Write(append(reqBytes, "\n"...)); err != nil {
+			if _, err = in.writer.Write(append(reqBytes, "\n"...)); err != nil {
 				t.Fatalf("in Write: %+v", err)
 			}
 
@@ -243,7 +243,7 @@ func TestServerHandle(t *testing.T) {
 			}
 
 			var respMap map[string]interface{}
-			if err := pkg.JsonUnmarshal(respBytes, &respMap); err != nil {
+			if err = pkg.JSONUnmarshal(respBytes, &respMap); err != nil {
 				t.Fatal(err)
 			}
 
@@ -253,7 +253,7 @@ func TestServerHandle(t *testing.T) {
 				t.Fatalf("json Marshal: %+v", err)
 			}
 			var expectedRespMap map[string]interface{}
-			if err := pkg.JsonUnmarshal(expectedRespBytes, &expectedRespMap); err != nil {
+			if err := pkg.JSONUnmarshal(expectedRespBytes, &expectedRespMap); err != nil {
 				t.Fatal(err)
 			}
 
@@ -362,7 +362,7 @@ func TestServerNotify(t *testing.T) {
 			name:   "test_tools_changed_notify",
 			method: protocol.NotificationToolsListChanged,
 			f: func() {
-				server.RegisterTool(testTool, func(ctr *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+				server.RegisterTool(testTool, func(_ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 					return &protocol.CallToolResult{
 						Content: []protocol.Content{testToolCallContent},
 					}, nil
@@ -424,7 +424,7 @@ func TestServerNotify(t *testing.T) {
 				}
 
 				var notifyMap map[string]interface{}
-				if err := pkg.JsonUnmarshal(notifyBytes, &notifyMap); err != nil {
+				if err := pkg.JSONUnmarshal(notifyBytes, &notifyMap); err != nil {
 					t.Error(err)
 					return
 				}
@@ -436,7 +436,7 @@ func TestServerNotify(t *testing.T) {
 					return
 				}
 				var expectedNotifyMap map[string]interface{}
-				if err := pkg.JsonUnmarshal(expectedNotifyBytes, &expectedNotifyMap); err != nil {
+				if err := pkg.JSONUnmarshal(expectedNotifyBytes, &expectedNotifyMap); err != nil {
 					t.Error(err)
 					return
 				}
@@ -462,7 +462,7 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 	if err != nil {
 		t.Fatalf("json Marshal: %+v", err)
 	}
-	if _, err := in.Write(append(reqBytes, "\n"...)); err != nil {
+	if _, err = in.Write(append(reqBytes, "\n"...)); err != nil {
 		t.Fatalf("in Write: %+v", err)
 	}
 
@@ -475,7 +475,7 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 	}
 
 	var respMap map[string]interface{}
-	if err := pkg.JsonUnmarshal(respBytes, &respMap); err != nil {
+	if err = pkg.JSONUnmarshal(respBytes, &respMap); err != nil {
 		t.Fatal(err)
 	}
 
@@ -489,7 +489,7 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 		t.Fatalf("json Marshal: %+v", err)
 	}
 	var expectedRespMap map[string]interface{}
-	if err := pkg.JsonUnmarshal(expectedRespBytes, &expectedRespMap); err != nil {
+	if err = pkg.JSONUnmarshal(expectedRespBytes, &expectedRespMap); err != nil {
 		t.Fatal(err)
 	}
 
