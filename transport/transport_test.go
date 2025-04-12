@@ -2,12 +2,41 @@ package transport
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// testLogger used for test
+type testLogger struct {
+	errorCapture *string
+}
+
+func newTestLogger() *testLogger {
+	var errorLogCapture string
+	return &testLogger{
+		errorCapture: &errorLogCapture,
+	}
+}
+
+func (t *testLogger) Debugf(format string, a ...any) {
+	log.Printf("[testLogger Debug] "+format+"\n", a...)
+}
+
+func (t *testLogger) Infof(format string, a ...any) {
+	log.Printf("[testLogger Info] "+format+"\n", a...)
+}
+
+func (t *testLogger) Warnf(format string, a ...any) {
+	log.Printf("[testLogger Warn] "+format+"\n", a...)
+}
+
+func (t *testLogger) Errorf(format string, a ...any) {
+	*t.errorCapture = fmt.Sprintf(format, a...)
+}
 
 type serverReceive func(ctx context.Context, sessionID string, msg []byte) error
 
@@ -121,23 +150,4 @@ func TestServerReceiverF(t *testing.T) {
 	err := receiverFunc.Receive(context.Background(), expectedSessionID, expectedMsg)
 	assert.NoError(t, err)
 	assert.True(t, called)
-}
-
-// testLogger used for test
-type testLogger struct{}
-
-func (t *testLogger) Debugf(format string, a ...any) {
-	log.Printf("[testLogger Debug] "+format+"\n", a...)
-}
-
-func (t *testLogger) Infof(format string, a ...any) {
-	log.Printf("[testLogger Info] "+format+"\n", a...)
-}
-
-func (t *testLogger) Warnf(format string, a ...any) {
-	log.Printf("[testLogger Warn] "+format+"\n", a...)
-}
-
-func (t *testLogger) Errorf(format string, a ...any) {
-	log.Printf("[testLogger Error] "+format+"\n", a...)
 }

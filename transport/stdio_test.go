@@ -86,7 +86,7 @@ func TestStdioTransport(t *testing.T) {
 
 // Test StdioServerTransport options
 func TestStdioServerOptions(t *testing.T) {
-	customLogger := &testLogger{}
+	customLogger := newTestLogger()
 
 	server := NewStdioServerTransport(
 		WithStdioServerOptionLogger(customLogger),
@@ -97,7 +97,7 @@ func TestStdioServerOptions(t *testing.T) {
 
 // Test StdioClientTransport options
 func TestStdioClientOptions(t *testing.T) {
-	customLogger := &testLogger{}
+	customLogger := newTestLogger()
 	customEnv := []string{"DREAM=WORLDPEACE"}
 
 	client, err := NewStdioClientTransport("echo", []string{},
@@ -366,7 +366,7 @@ func TestStdioClientCloseError(t *testing.T) {
 // Test receive function error handling
 func TestStdioClientReceiveError(t *testing.T) {
 	client := &stdioClientTransport{
-		logger:          &testLogger{},
+		logger:          newTestLogger(),
 		receiveShutDone: make(chan struct{}),
 	}
 
