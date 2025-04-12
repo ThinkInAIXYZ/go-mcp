@@ -1,9 +1,12 @@
 module github.com/ThinkInAIXYZ/go-mcp
 
-go 1.18
+go 1.24
+
+toolchain go1.24.2
 
 require (
 	github.com/bytedance/sonic v1.13.2
+	github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874
 	github.com/google/uuid v1.6.0
 	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/stretchr/testify v1.10.0
