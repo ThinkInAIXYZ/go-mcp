@@ -41,7 +41,6 @@ func (m *mock) Close() error {
 }
 
 func TestStdioTransport(t *testing.T) {
-
 	var (
 		err    error
 		server *stdioServerTransport
@@ -128,7 +127,6 @@ func newStdioServerWithReader(reader io.ReadCloser) *stdioServerTransport {
 
 // Test StdioServerTransport Shutdown functionality
 func TestStdioServerShutdown(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := newStdioServerWithReader(reader)
 
@@ -157,7 +155,6 @@ func TestStdioServerShutdown(t *testing.T) {
 
 // Test StdioServerTransport Shutdown when user ctx cancel
 func TestStdioServerCancelByUserCtx(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := newStdioServerWithReader(reader)
 
@@ -169,7 +166,7 @@ func TestStdioServerCancelByUserCtx(t *testing.T) {
 	// Wait for the server to start
 	time.Sleep(100 * time.Millisecond)
 
-	// Create a cancelled context
+	// Create a canceled context
 	canceledCtx, cancelFn := context.WithCancel(context.Background())
 	cancelFn()
 
@@ -191,7 +188,6 @@ func TestStdioServerCancelByUserCtx(t *testing.T) {
 
 // Test triggering receive shutdown done channel in StdioServerTransport
 func TestStdioServerReceiveShutdownDone(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := newStdioServerWithReader(reader)
 
@@ -241,13 +237,12 @@ func TestStdioServerReceiveShutdownDone(t *testing.T) {
 
 // Test StdioServerTransport when the receiver returns an error
 func TestStdioServerReceiveError(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := newStdioServerWithReader(reader)
 
 	// Set a receiver that will report an error when receiving data
 	receiverCalled := make(chan struct{})
-	server.SetReceiver(ServerReceiverF(func(ctx context.Context, sessionID string, msg []byte) error {
+	server.SetReceiver(ServerReceiverF(func(_ context.Context, _ string, _ []byte) error {
 		close(receiverCalled)
 		return fmt.Errorf("server receiver error")
 	}))
@@ -301,7 +296,6 @@ func TestStdioServerReceiveError(t *testing.T) {
 
 // Test StdioServerTransport receive not ErrClosedPipe but else
 func TestStdioServerReceiveNonErrClosedPipe(t *testing.T) {
-
 	server := newStdioServerWithReader(&errorReader{})
 
 	server.SetReceiver(ServerReceiverF(func(ctx context.Context, sessionID string, msg []byte) error {
@@ -375,7 +369,7 @@ func TestStdioClientReceiveError(t *testing.T) {
 	client.reader = errorPipe
 
 	// Set a receiver that will report an error
-	client.SetReceiver(ClientReceiverF(func(ctx context.Context, msg []byte) error {
+	client.SetReceiver(ClientReceiverF(func(_ context.Context, _ []byte) error {
 		return fmt.Errorf("receiver error")
 	}))
 
@@ -409,6 +403,7 @@ type errorWriter struct{}
 func (w *errorWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil // Write succeeds, but close will fail
 }
+
 func (w *errorWriter) Close() error {
 	return fmt.Errorf("mock readWriter close error")
 }
@@ -416,7 +411,7 @@ func (w *errorWriter) Close() error {
 // errorReader
 type errorReader struct{}
 
-func (s *errorReader) Read(p []byte) (n int, err error) {
+func (s *errorReader) Read(_ []byte) (n int, err error) {
 	// not ErrClosedPipe
 	return 0, fmt.Errorf("mock reader read error")
 }

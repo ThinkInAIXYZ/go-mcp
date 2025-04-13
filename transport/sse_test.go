@@ -143,9 +143,9 @@ func TestSSEServerOptions(t *testing.T) {
 
 // Test SSE server error handling
 func TestSSEServerErrorHandling(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		w.Write(pkg.S2B("Internal Server Error"))
 	}))
 	defer server.Close()
 
@@ -235,7 +235,7 @@ func TestHandleSSEEvent(t *testing.T) {
 
 	// Set up a receiver
 	receivedMsg := make(chan []byte, 1)
-	transport.SetReceiver(ClientReceiverF(func(ctx context.Context, msg []byte) error {
+	transport.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		receivedMsg <- msg
 		return nil
 	}))
@@ -276,7 +276,7 @@ data: {"jsonrpc":"2.0","id":1,"method":"test"}
 `
 	// Set up a receiver
 	receivedMsg := make(chan []byte, 1)
-	transport.SetReceiver(ClientReceiverF(func(ctx context.Context, msg []byte) error {
+	transport.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
 		receivedMsg <- msg
 		return nil
 	}))
@@ -428,7 +428,7 @@ func TestSSEClientTransportSendFailure(t *testing.T) {
 				}
 
 				// Create a test server that will never be accessed
-				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 					time.Sleep(time.Second)
 					w.WriteHeader(http.StatusOK)
 				}))
@@ -449,7 +449,7 @@ func TestSSEClientTransportSendFailure(t *testing.T) {
 				// Create a test server that always returns an error
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Internal Server Error"))
+					w.Write(pkg.S2B("Internal Server Error"))
 				}))
 
 				endpoint, _ := url.Parse(server.URL)
@@ -577,7 +577,7 @@ func TestHandleSSEEventErrors(t *testing.T) {
 		}
 
 		// Set up a receiver that returns an error
-		transport.SetReceiver(ClientReceiverF(func(ctx context.Context, msg []byte) error {
+		transport.SetReceiver(ClientReceiverF(func(_ context.Context, _ []byte) error {
 			return fmt.Errorf("simulated receive error")
 		}))
 
@@ -591,7 +591,6 @@ func TestHandleSSEEventErrors(t *testing.T) {
 }
 
 func TestSSEServerTransportSendFail(t *testing.T) {
-
 	svr, _ := NewSSEServerTransport("localhost:8080")
 
 	invalidSessionID := "invalid-session-id"
@@ -625,7 +624,7 @@ func TestReadSSEError(t *testing.T) {
 			close(done)
 		}()
 
-		pw.Write([]byte("event: test\ndata: testdata\n\n"))
+		pw.Write(pkg.S2B("event: test\ndata: testdata\n\n"))
 
 		pw.Close()
 
@@ -657,6 +656,6 @@ type customErrorReader struct {
 	err error
 }
 
-func (r *customErrorReader) Read(p []byte) (n int, err error) {
+func (r *customErrorReader) Read(_ []byte) (n int, err error) {
 	return 0, r.err
 }

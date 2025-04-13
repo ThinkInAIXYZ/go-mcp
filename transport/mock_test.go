@@ -3,10 +3,11 @@ package transport
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMockTransport(t *testing.T) {
@@ -20,17 +21,16 @@ func TestMockTransport(t *testing.T) {
 }
 
 // Test receive function error handling
-func TestMockClientReceiveError(t *testing.T) {
-	
+func TestMockClientReceiveError(_ *testing.T) {
 	errReader1, errWriter1 := &errorReader{}, &errorWriter{}
 	clientTransport := NewMockClientTransport(errReader1, errWriter1)
 
-	//Set a receiver that will report an error
+	// Set a receiver that will report an error
 	clientTransport.SetReceiver(ClientReceiverF(func(ctx context.Context, msg []byte) error {
 		return fmt.Errorf("receiver error")
 	}))
 
-	//Create a context
+	// Create a context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -40,13 +40,12 @@ func TestMockClientReceiveError(t *testing.T) {
 		close(clientTransport.receiveShutDone)
 	}()
 
-	//Wait for processing to complete
+	// Wait for processing to complete
 	<-clientTransport.receiveShutDone
 }
 
 // Test TestMockServerCancelByUserCtx Shutdown when user ctx cancel
 func TestMockServerCancelByUserCtx(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := NewMockServerTransport(reader, writer)
 
@@ -58,7 +57,7 @@ func TestMockServerCancelByUserCtx(t *testing.T) {
 	// Wait for the server to start
 	time.Sleep(100 * time.Millisecond)
 
-	// Create a cancelled context
+	// Create a canceled context
 	canceledCtx, cancelFn := context.WithCancel(context.Background())
 	cancelFn()
 
@@ -80,7 +79,6 @@ func TestMockServerCancelByUserCtx(t *testing.T) {
 
 // Test MockServerTransport when the receiver returns an error
 func TestMockServerReceiveError(t *testing.T) {
-
 	reader, writer := io.Pipe()
 	server := NewMockServerTransport(reader, writer)
 
@@ -140,9 +138,7 @@ func TestMockServerReceiveError(t *testing.T) {
 
 // Test MockServerTransport receive not ErrClosedPipe but else
 func TestMockServerReceiveNonErrClosedPipe(t *testing.T) {
-
 	server := NewMockServerTransport(&errorReader{}, &errorWriter{})
-
 	server.SetReceiver(ServerReceiverF(func(ctx context.Context, sessionID string, msg []byte) error {
 		return nil
 	}))

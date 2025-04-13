@@ -26,6 +26,10 @@ func B2S(b []byte) string {
 	return *(*string)(unsafe.Pointer(&b))
 }
 
+func S2B(s string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&s))
+}
+
 func JoinErrors(errs []error) error {
 	if len(errs) == 0 {
 		return nil
