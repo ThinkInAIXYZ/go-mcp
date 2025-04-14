@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/wangle201210/text2sql"
 	"github.com/wangle201210/text2sql/eino"
+
+	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
 func getText2sqlTool() *protocol.Tool {
@@ -17,10 +18,10 @@ func getText2sqlTool() *protocol.Tool {
 		Description: "Natural language to database query",
 		InputSchema: protocol.InputSchema{
 			Type: protocol.Object,
-			Properties: map[string]interface{}{
-				"question": map[string]string{
-					"type":        "string",
-					"description": "Questions to query data",
+			Properties: map[string]*protocol.Property{
+				"question": {
+					Type:        "string",
+					Description: "Questions to query data",
 				},
 			},
 			Required: []string{"question"},

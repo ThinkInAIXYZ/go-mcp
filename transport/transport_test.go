@@ -38,6 +38,35 @@ func (t *testLogger) Errorf(format string, a ...any) {
 	*t.errorCapture = fmt.Sprintf(format, a...)
 }
 
+// Error writer for testing
+type errorWriter struct{}
+
+func (w *errorWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil // Write succeeds, but close will fail
+}
+
+func (w *errorWriter) Close() error {
+	return fmt.Errorf("mock writer close error")
+}
+
+// Error reader for testing
+type errorReader struct{}
+
+func (s *errorReader) Read(_ []byte) (n int, err error) {
+	// not ErrClosedPipe
+	return 0, fmt.Errorf("mock reader read error")
+}
+
+func (s *errorReader) Close() error {
+	return nil
+}
+
+var (
+	serverReceiveEmpty = func(_ context.Context, _ string, _ []byte) error { return nil }
+	clientReceiveEmpty = func(_ context.Context, _ []byte) error { return nil }
+	clientReceiveError = func(_ context.Context, _ []byte) error { return fmt.Errorf("receiver error") }
+)
+
 type serverReceive func(ctx context.Context, sessionID string, msg []byte) error
 
 func (r serverReceive) Receive(ctx context.Context, sessionID string, msg []byte) error {
@@ -124,7 +153,7 @@ func TestClientReceiverF(t *testing.T) {
 	called := false
 	expectedMsg := []byte("this is a message from ThinkInAI team!")
 
-	receiverFunc := ClientReceiverF(func(ctx context.Context, msg []byte) error {
+	receiverFunc := ClientReceiverF(func(_ context.Context, msg []byte) error {
 		called = true
 		assert.Equal(t, expectedMsg, msg)
 		return nil
@@ -140,7 +169,7 @@ func TestServerReceiverF(t *testing.T) {
 	expectedMsg := []byte("this is a message from ThinkInAI team!")
 	expectedSessionID := "test-session"
 
-	receiverFunc := ServerReceiverF(func(ctx context.Context, sessionID string, msg []byte) error {
+	receiverFunc := ServerReceiverF(func(_ context.Context, sessionID string, msg []byte) error {
 		called = true
 		assert.Equal(t, expectedSessionID, sessionID)
 		assert.Equal(t, expectedMsg, msg)
