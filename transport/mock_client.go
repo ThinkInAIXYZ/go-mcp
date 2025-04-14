@@ -9,6 +9,14 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
+type MockClientTransportOption func(*MockClientTransport)
+
+func WithMockClientOptionLogger(log pkg.Logger) MockClientTransportOption {
+	return func(t *MockClientTransport) {
+		t.logger = log
+	}
+}
+
 type MockClientTransport struct {
 	receiver ClientReceiver
 	in       io.Reader
@@ -20,13 +28,19 @@ type MockClientTransport struct {
 	receiveShutDone chan struct{}
 }
 
-func NewMockClientTransport(in io.Reader, out io.Writer) *MockClientTransport {
-	return &MockClientTransport{
+func NewMockClientTransport(in io.Reader, out io.Writer, opts ...MockClientTransportOption) *MockClientTransport {
+	client := &MockClientTransport{
 		in:              in,
 		out:             out,
 		logger:          pkg.DefaultLogger,
 		receiveShutDone: make(chan struct{}),
 	}
+
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	return client
 }
 
 func (t *MockClientTransport) Start() error {

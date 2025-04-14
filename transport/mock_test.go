@@ -69,8 +69,12 @@ func TestMockClientReceiverError(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify that the error was logged correctly
-	assert.Contains(t, errorMsg, "receiver failed")
-	assert.Contains(t, errorMsg, expectedError.Error())
+	customLogger.mu.Lock()
+	errorMsgCopy := errorMsg
+	customLogger.mu.Unlock()
+
+	assert.Contains(t, errorMsgCopy, "receiver failed")
+	assert.Contains(t, errorMsgCopy, expectedError.Error())
 
 	// Close the transport
 	err = clientTransport.Close()
@@ -86,7 +90,7 @@ func TestMockClientReceiverError(t *testing.T) {
 // Test receive function error handling
 func TestMockClientReceiveError(_ *testing.T) {
 	errReader1, errWriter1 := &errorReader{}, &errorWriter{}
-	clientTransport := NewMockClientTransport(errReader1, errWriter1)
+	clientTransport := NewMockClientTransport(errReader1, errWriter1, WithMockClientOptionLogger(newTestLogger()))
 
 	// Set a receiver that will report an error
 	clientTransport.SetReceiver(ClientReceiverF(func(_ context.Context, _ []byte) error {
@@ -110,7 +114,7 @@ func TestMockClientReceiveError(_ *testing.T) {
 // Test TestMockServerCancelByUserCtx Shutdown when user ctx cancel
 func TestMockServerCancelByUserCtx(t *testing.T) {
 	reader, writer := io.Pipe()
-	server := NewMockServerTransport(reader, writer)
+	server := NewMockServerTransport(reader, writer, WithMockServerOptionLogger(newTestLogger()))
 
 	go func() {
 		err := server.Run()
@@ -143,7 +147,7 @@ func TestMockServerCancelByUserCtx(t *testing.T) {
 // Test MockServerTransport when the receiver returns an error
 func TestMockServerReceiveError(t *testing.T) {
 	reader, writer := io.Pipe()
-	server := NewMockServerTransport(reader, writer)
+	server := NewMockServerTransport(reader, writer, WithMockServerOptionLogger(newTestLogger()))
 
 	// Set a receiver that will report an error when receiving data
 	receiverCalled := make(chan struct{})
@@ -201,7 +205,7 @@ func TestMockServerReceiveError(t *testing.T) {
 
 // Test MockServerTransport receive not ErrClosedPipe but else
 func TestMockServerReceiveNonErrClosedPipe(t *testing.T) {
-	server := NewMockServerTransport(&errorReader{}, &errorWriter{})
+	server := NewMockServerTransport(&errorReader{}, &errorWriter{}, WithMockServerOptionLogger(newTestLogger()))
 	server.SetReceiver(ServerReceiverF(serverReceiveEmpty))
 
 	// start server

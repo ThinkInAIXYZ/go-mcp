@@ -148,7 +148,7 @@ func TestSSEClientOptions(t *testing.T) {
 	customTimeout := 5 * time.Second
 	customClient := &http.Client{Timeout: 10 * time.Second}
 
-	client, err := NewSSEClientTransport("http://example.com/sse",
+	client, err := NewSSEClientTransport("https://ThinkInAI.com/sse",
 		WithSSEClientOptionReceiveTimeout(customTimeout),
 		WithSSEClientOptionHTTPClient(customClient),
 		WithSSEClientOptionLogger(customLogger),
@@ -168,7 +168,7 @@ func TestSSEServerOptions(t *testing.T) {
 	customLogger := newTestLogger()
 	customSSEPath := "/custom-sse"
 	customMsgPath := "/custom-message"
-	customURLPrefix := "http://test.example.com"
+	customURLPrefix := "https://test.ThinkInAI.com"
 
 	server, err := NewSSEServerTransport("localhost:8080",
 		WithSSEServerTransportOptionLogger(customLogger),
@@ -189,7 +189,7 @@ func TestSSEServerOptions(t *testing.T) {
 
 // Test SSE server message handling errors
 func TestSSEServerMessageHandling(t *testing.T) {
-	svr, handler, err := NewSSEServerTransportAndHandler("http://example.com/message", WithSSEServerTransportAndHandlerOptionLogger(newTestLogger()))
+	svr, handler, err := NewSSEServerTransportAndHandler("https://ThinkInAI.com/message", WithSSEServerTransportAndHandlerOptionLogger(newTestLogger()))
 	assert.NoError(t, err)
 
 	// Test unsupported HTTP method
@@ -354,15 +354,15 @@ func TestCompleteMessagePath(t *testing.T) {
 	}{
 		{
 			name:        "Valid URL",
-			urlPrefix:   "https://example.com",
+			urlPrefix:   "https://ThinkInAI.com",
 			messagePath: "/message",
-			expectedURL: "https://example.com/message",
+			expectedURL: "https://ThinkInAI.com/message",
 		},
 		{
 			name:        "URL with trailing slash",
-			urlPrefix:   "https://example.com/",
+			urlPrefix:   "https://ThinkInAI.com/",
 			messagePath: "message",
-			expectedURL: "https://example.com/message",
+			expectedURL: "https://ThinkInAI.com/message",
 		},
 	}
 
@@ -392,29 +392,29 @@ func TestSSEClientHandleSSEEvent(t *testing.T) {
 		{
 			name:          "URL with sessionID",
 			event:         "endpoint",
-			data:          "https://example.com/message?sessionID=test",
-			want:          "https://example.com/message?sessionID=test",
+			data:          "https://ThinkInAI.com/message?sessionID=test",
+			want:          "https://ThinkInAI.com/message?sessionID=test",
 			errorReceiver: nil,
 			wantErr:       false,
 		},
 		{
 			name:          "URL without sessionID",
 			event:         "endpoint",
-			data:          "https://thinkInAI.com/mcp",
-			want:          "https://thinkInAI.com/mcp",
+			data:          "https://ThinkInAI.com/mcp",
+			want:          "https://ThinkInAI.com/mcp",
 			errorReceiver: nil,
 			wantErr:       false,
 		},
 		{
 			name:          "Invalid URL in data",
 			event:         "endpoint",
-			data:          "httsp://invalid url with spaces",
+			data:          "https://invalid url with spaces",
 			want:          "Error parsing endpoint URL",
 			errorReceiver: nil,
 			wantErr:       true,
 		},
 		{
-			name:          "message event",
+			name:          "Message event success",
 			event:         "message",
 			data:          "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"test\"}",
 			want:          "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"test\"}",
@@ -422,7 +422,7 @@ func TestSSEClientHandleSSEEvent(t *testing.T) {
 			wantErr:       false,
 		},
 		{
-			name:          "message rece error",
+			name:          "Message receive error",
 			event:         "message",
 			data:          "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"test\"}",
 			want:          "Error receive message",
@@ -440,7 +440,7 @@ func TestSSEClientHandleSSEEvent(t *testing.T) {
 
 			transport := &sseClientTransport{
 				serverURL: func() *url.URL {
-					uri, err := url.Parse("http://example.com/sse")
+					uri, err := url.Parse("https://ThinkInAI.com/sse")
 					if err != nil {
 						panic(err)
 					}
@@ -504,7 +504,7 @@ func TestReadSSE(t *testing.T) {
 	// Create test SSE data
 	sseData := `
 event: endpoint
-data: http://example.com/message
+data: https://ThinkInAI.com/message
 
 event: message
 data: {"jsonrpc":"2.0","id":1,"method":"test"}
@@ -656,7 +656,7 @@ func TestSSEClientSendFailure(t *testing.T) {
 		expectedErr string
 	}{
 		{
-			name: "Failure - Create request failed",
+			name: "Create request failed",
 			setupMock: func() (*sseClientTransport, *httptest.Server) {
 				// Set an invalid URL that will cause NewRequestWithContext to fail
 				transport := &sseClientTransport{
@@ -672,7 +672,7 @@ func TestSSEClientSendFailure(t *testing.T) {
 			expectedErr: "failed to create request:",
 		},
 		{
-			name: "Failure - Send request failed",
+			name: "Send request failed",
 			setupMock: func() (*sseClientTransport, *httptest.Server) {
 				// Set up a client that will cause Do method to fail
 				customClient := &http.Client{
@@ -697,7 +697,7 @@ func TestSSEClientSendFailure(t *testing.T) {
 			expectedErr: "failed to send message:",
 		},
 		{
-			name: "Failure - Non-success status code",
+			name: "Non-success status code",
 			setupMock: func() (*sseClientTransport, *httptest.Server) {
 				// Create a test server that always returns an error
 				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -783,7 +783,7 @@ func TestSSEClientRespBodyCloseError(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 
 		// Send endpoint event so the client can continue execution
-		_, _ = fmt.Fprintf(w, "event: endpoint\ndata: %s/message\n\n", "https://example.com")
+		_, _ = fmt.Fprintf(w, "event: endpoint\ndata: %s/message\n\n", "https://ThinkInAI.com")
 
 		// Flush the response
 		if f, ok := w.(http.Flusher); ok {
@@ -844,9 +844,13 @@ func TestSSEClientRespBodyCloseError(t *testing.T) {
 	// Give some time for the log to be recorded
 	time.Sleep(100 * time.Millisecond)
 
+	mockLogger.mu.Lock()
+	errorLogCopy := errorLogCapture
+	mockLogger.mu.Unlock()
+
 	// Verify that the log contains the expected error message
-	assert.Contains(t, errorLogCapture, "failed to close SSE stream body")
-	assert.Contains(t, errorLogCapture, "mock response body close error")
+	assert.Contains(t, errorLogCopy, "failed to close SSE stream body")
+	assert.Contains(t, errorLogCopy, "mock response body close error")
 }
 
 // getAvailablePort returns a port that is available for use

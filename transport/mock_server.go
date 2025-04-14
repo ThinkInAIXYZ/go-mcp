@@ -6,9 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
+
+type MockServerTransportOption func(*MockServerTransport)
+
+func WithMockServerOptionLogger(log pkg.Logger) MockServerTransportOption {
+	return func(t *MockServerTransport) {
+		t.logger = log
+	}
+}
 
 const mockSessionID = "mock"
 
@@ -19,23 +28,32 @@ type MockServerTransport struct {
 
 	logger pkg.Logger
 
+	mu              sync.Mutex
 	cancel          context.CancelFunc
 	receiveShutDone chan struct{}
 }
 
-func NewMockServerTransport(in io.ReadCloser, out io.Writer) ServerTransport {
-	return &MockServerTransport{
+func NewMockServerTransport(in io.ReadCloser, out io.Writer, opts ...MockServerTransportOption) ServerTransport {
+	server := &MockServerTransport{
 		in:     in,
 		out:    out,
 		logger: pkg.DefaultLogger,
 
 		receiveShutDone: make(chan struct{}),
 	}
+
+	for _, opt := range opts {
+		opt(server)
+	}
+
+	return server
 }
 
 func (t *MockServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
+	t.mu.Lock()
 	t.cancel = cancel
+	t.mu.Unlock()
 
 	t.receive(ctx)
 
@@ -55,7 +73,11 @@ func (t *MockServerTransport) SetReceiver(receiver ServerReceiver) {
 }
 
 func (t *MockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
-	t.cancel()
+	t.mu.Lock()
+	if t.cancel != nil {
+		t.cancel()
+	}
+	t.mu.Unlock()
 
 	if err := t.in.Close(); err != nil {
 		return err

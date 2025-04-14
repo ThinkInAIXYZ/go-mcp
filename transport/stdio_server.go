@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -28,6 +29,7 @@ type stdioServerTransport struct {
 
 	logger pkg.Logger
 
+	mu              sync.Mutex
 	cancel          context.CancelFunc
 	receiveShutDone chan struct{}
 }
@@ -49,7 +51,9 @@ func NewStdioServerTransport(opts ...StdioServerTransportOption) ServerTransport
 
 func (t *stdioServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
+	t.mu.Lock()
 	t.cancel = cancel
+	t.mu.Unlock()
 
 	t.receive(ctx)
 
@@ -69,7 +73,11 @@ func (t *stdioServerTransport) SetReceiver(receiver ServerReceiver) {
 }
 
 func (t *stdioServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {
-	t.cancel()
+	t.mu.Lock()
+	if t.cancel != nil {
+		t.cancel()
+	}
+	t.mu.Unlock()
 
 	if err := t.reader.Close(); err != nil {
 		return err

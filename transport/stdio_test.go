@@ -122,6 +122,7 @@ func TestStdioClientOptions(t *testing.T) {
 func newStdioServerWithReader(reader io.ReadCloser) *stdioServerTransport {
 	server := NewStdioServerTransport().(*stdioServerTransport)
 	server.reader = reader
+	server.logger = newTestLogger()
 	return server
 }
 

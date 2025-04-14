@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 
 // testLogger used for test
 type testLogger struct {
+	mu           sync.Mutex
 	errorCapture *string
 }
 
@@ -35,6 +37,8 @@ func (t *testLogger) Warnf(format string, a ...any) {
 }
 
 func (t *testLogger) Errorf(format string, a ...any) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	*t.errorCapture = fmt.Sprintf(format, a...)
 }
 
