@@ -127,7 +127,7 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 	return t, nil
 }
 
-// NewSSEServerTransportAndHandler returns a transport without starting the HTTP server,
+// NewSSEServerTransportAndHandler returns transport without starting the HTTP server,
 // and returns a Handler for users to start their own HTTP server externally
 func NewSSEServerTransportAndHandler(messageEndpointFullURL string,
 	opts ...SSEServerTransportAndHandlerOption,

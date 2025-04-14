@@ -32,38 +32,15 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	// new protocal tool with name, descipriton and properties
+	// new protocol tool with name, descipriton and properties
 	tool, err := protocol.NewTool("current time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
 
-	// new tool handler and return result
-	handler := func(request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
-		req := new(currentTimeReq)
-		if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
-			return nil, err
-		}
-
-		loc, err := time.LoadLocation(req.Timezone)
-		if err != nil {
-			return nil, fmt.Errorf("parse timezone with error: %v", err)
-		}
-		text := fmt.Sprintf(`current time is %s`, time.Now().In(loc))
-
-		return &protocol.CallToolResult{
-			Content: []protocol.Content{
-				protocol.TextContent{
-					Type: "text",
-					Text: text,
-				},
-			},
-		}, nil
-	}
-
 	// register tool and start mcp server
-	srv.RegisterTool(tool, handler)
+	srv.RegisterTool(tool, currentTime)
 	// srv.RegisterResource()
 	// srv.RegisterPrompt()
 	// srv.RegisterResourceTemplate()
@@ -104,6 +81,28 @@ func getTransport() (t transport.ServerTransport) {
 	}
 
 	return t
+}
+
+func currentTime(request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	req := new(currentTimeReq)
+	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
+		return nil, err
+	}
+
+	loc, err := time.LoadLocation(req.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("parse timezone with error: %v", err)
+	}
+	text := fmt.Sprintf(`current time is %s`, time.Now().In(loc))
+
+	return &protocol.CallToolResult{
+		Content: []protocol.Content{
+			protocol.TextContent{
+				Type: "text",
+				Text: text,
+			},
+		},
+	}, nil
 }
 
 func signalWaiter(errCh chan error) error {

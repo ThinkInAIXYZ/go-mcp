@@ -76,8 +76,8 @@ func TestSSEHandler(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		if err = http.ListenAndServe(fmt.Sprintf(":%d", port), nil); err != nil {
-			log.Fatalf("Failed to start HTTP server: %v", err)
+		if e := http.ListenAndServe(fmt.Sprintf(":%d", port), nil); e != nil {
+			log.Fatalf("Failed to start HTTP server: %v", e)
 		}
 	}()
 

@@ -39,7 +39,7 @@ TOOLS_SHELL="./hack/tools.sh"
 LINTER := bin/golangci-lint
 
 $(LINTER):
-	curl -SL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
+	curl -SL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v2.1.1
 
 .PHONY: init-dev
 init-dev:

@@ -38,7 +38,7 @@ type sseClientTransport struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	serverURL string
+	serverURL *url.URL
 
 	endpointChan    chan struct{}
 	messageEndpoint *url.URL
@@ -48,21 +48,29 @@ type sseClientTransport struct {
 	logger         pkg.Logger
 	receiveTimeout time.Duration
 	client         *http.Client
+
+	sseConnectClose chan struct{}
 }
 
 func NewSSEClientTransport(serverURL string, opts ...SSEClientTransportOption) (ClientTransport, error) {
+	parsedURL, err := url.Parse(serverURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse server URL: %w", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	x := &sseClientTransport{
 		ctx:             ctx,
 		cancel:          cancel,
-		serverURL:       serverURL,
+		serverURL:       parsedURL,
 		endpointChan:    make(chan struct{}, 1),
 		messageEndpoint: nil,
 		receiver:        nil,
 		logger:          pkg.DefaultLogger,
 		receiveTimeout:  time.Second * 30,
 		client:          http.DefaultClient,
+		sseConnectClose: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -77,7 +85,7 @@ func (t *sseClientTransport) Start() error {
 	go func() {
 		defer pkg.Recover()
 
-		req, err := http.NewRequest(http.MethodGet, t.serverURL, nil)
+		req, err := http.NewRequest(http.MethodGet, t.serverURL.String(), nil)
 		if err != nil {
 			errChan <- fmt.Errorf("failed to create request: %w", err)
 			return
@@ -87,19 +95,32 @@ func (t *sseClientTransport) Start() error {
 		req.Header.Set("Cache-Control", "no-cache")
 		req.Header.Set("Connection", "keep-alive")
 
-		resp, err := t.client.Do(req)
+		resp, err := t.client.Do(req) //nolint:bodyclose
 		if err != nil {
 			errChan <- fmt.Errorf("failed to connect to SSE stream: %w", err)
 			return
 		}
-		defer resp.Body.Close() // Move the defer inside the goroutine
+		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			errChan <- fmt.Errorf("unexpected status code: %d, status: %s", resp.StatusCode, resp.Status)
 			return
 		}
 
+		go func() {
+			defer pkg.Recover()
+
+			<-t.ctx.Done()
+
+			if err := resp.Body.Close(); err != nil {
+				t.logger.Errorf("failed to close SSE stream body: %w", err)
+				return
+			}
+		}()
+
 		t.readSSE(resp.Body)
+
+		close(t.sseConnectClose)
 	}()
 
 	// Wait for the endpoint to be received
@@ -169,7 +190,7 @@ func (t *sseClientTransport) readSSE(reader io.ReadCloser) {
 func (t *sseClientTransport) handleSSEEvent(event, data string) {
 	switch event {
 	case "endpoint":
-		endpoint, err := url.Parse(data)
+		endpoint, err := t.serverURL.Parse(data)
 		if err != nil {
 			t.logger.Errorf("Error parsing endpoint URL: %v", err)
 			return
@@ -221,6 +242,8 @@ func (t *sseClientTransport) SetReceiver(receiver ClientReceiver) {
 
 func (t *sseClientTransport) Close() error {
 	t.cancel()
+
+	<-t.sseConnectClose
 
 	return nil
 }
