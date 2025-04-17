@@ -224,13 +224,14 @@ func (client *Client) callServer(ctx context.Context, method protocol.Method, pa
 	}
 
 	requestID := strconv.FormatInt(atomic.AddInt64(&client.requestID, 1), 10)
+	respChan := make(chan *protocol.JSONRPCResponse, 1)
+	client.reqID2respChan.Set(requestID, respChan)
+
 	if err := client.sendMsgWithRequest(ctx, requestID, method, params); err != nil {
+		client.reqID2respChan.Remove(requestID)
 		return nil, fmt.Errorf("callServer: %w", err)
 	}
 
-	respChan := make(chan *protocol.JSONRPCResponse, 1)
-
-	client.reqID2respChan.Set(requestID, respChan)
 	defer client.reqID2respChan.Remove(requestID)
 
 	select {
