@@ -77,6 +77,14 @@ func (m *Manager) CloseSession(sessionID string) {
 	state.Close()
 }
 
+func (m *Manager) CheckSessionReady(sessionID string) bool {
+	state, ok := m.sessions.Load(sessionID)
+	if !ok {
+		return false
+	}
+	return state.GetReady()
+}
+
 func (m *Manager) CloseAllSessions() {
 	m.sessions.Range(func(sessionID string, _ *State) bool {
 		// Here we load the session again to prevent concurrency conflicts with CloseSession, which may cause repeated close chan
@@ -99,6 +107,10 @@ func (m *Manager) StartHeartbeatAndCleanInvalidSessions() {
 	case <-ticker.C:
 		now := time.Now()
 		m.sessions.Range(func(sessionID string, state *State) bool {
+			if !m.CheckSessionReady(sessionID) {
+				m.CloseSession(sessionID)
+				return true
+			}
 			if m.maxIdleTime != 0 && now.Sub(state.lastActiveAt) > m.maxIdleTime {
 				m.CloseSession(sessionID)
 				return true
