@@ -8,6 +8,10 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
+type SamplingHandler interface {
+	CreateMessage(ctx context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error)
+}
+
 // NotifyHandler
 // When implementing a custom NotifyHandler, you can combine it with BaseNotifyHandler to implement it on demand without implementing extra methods.
 type NotifyHandler interface {

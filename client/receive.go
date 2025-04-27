@@ -79,8 +79,8 @@ func (client *Client) receiveRequest(ctx context.Context, request *protocol.JSON
 		result, err = client.handleRequestWithPing()
 	// case protocol.RootsList:
 	// 	result, err = client.handleRequestWithListRoots(ctx, request.RawParams)
-	// case protocol.SamplingCreateMessage:
-	// 	result, err = client.handleRequestWithCreateMessagesSampling(ctx, request.RawParams)
+	case protocol.SamplingCreateMessage:
+		result, err = client.handleRequestWithCreateMessagesSampling(ctx, request.RawParams)
 	default:
 		err = fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, request.Method)
 	}

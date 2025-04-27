@@ -29,6 +29,33 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 	return &result, nil
 }
 
+func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error) {
+	sessionID, err := getSessionIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return nil, pkg.ErrLackSession
+	}
+
+	if s.GetClientCapabilities() == nil || s.GetClientCapabilities().Sampling == nil {
+		return nil, pkg.ErrServerNotSupport
+	}
+
+	response, err := server.callClient(ctx, sessionID, protocol.SamplingCreateMessage, request)
+	if err != nil {
+		return nil, err
+	}
+
+	var result protocol.CreateMessageResult
+	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	return &result, nil
+}
+
 func (server *Server) sendNotification4ToolListChanges(ctx context.Context) error {
 	if server.capabilities.Tools == nil || !server.capabilities.Tools.ListChanged {
 		return pkg.ErrServerNotSupport

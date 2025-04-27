@@ -89,6 +89,8 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 }
 
 func (server *Server) receiveRequest(ctx context.Context, sessionID string, request *protocol.JSONRPCRequest) *protocol.JSONRPCResponse {
+	ctx = setSessionIDToCtx(ctx, sessionID)
+
 	if request.Method != protocol.Ping {
 		server.sessionManager.UpdateSessionLastActiveAt(sessionID)
 	}

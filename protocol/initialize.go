@@ -25,7 +25,7 @@ type Implementation struct {
 type ClientCapabilities struct {
 	// Experimental map[string]interface{} `json:"experimental,omitempty"`
 	// Roots        *RootsCapability       `json:"roots,omitempty"`
-	// Sampling     interface{}            `json:"sampling,omitempty"`
+	Sampling interface{} `json:"sampling,omitempty"`
 }
 
 type RootsCapability struct {

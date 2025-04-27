@@ -12,6 +12,21 @@ func (client *Client) handleRequestWithPing() (*protocol.PingResult, error) {
 	return protocol.NewPingResult(), nil
 }
 
+func (client *Client) handleRequestWithCreateMessagesSampling(ctx context.Context, rawParams json.RawMessage) (*protocol.CreateMessageResult, error) {
+	if client.clientCapabilities.Sampling == nil {
+		return nil, pkg.ErrClientNotSupport
+	}
+
+	var request *protocol.CreateMessageRequest
+	if len(rawParams) > 0 {
+		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
+			return nil, err
+		}
+	}
+
+	return client.samplingHandler.CreateMessage(ctx, request)
+}
+
 func (client *Client) handleNotifyWithToolsListChanged(ctx context.Context, rawParams json.RawMessage) error {
 	notify := &protocol.ToolListChangedNotification{}
 	if len(rawParams) > 0 {

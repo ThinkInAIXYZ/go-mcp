@@ -21,6 +21,12 @@ func WithNotifyHandler(handler NotifyHandler) Option {
 	}
 }
 
+func WithSamplingHandler(handler SamplingHandler) Option {
+	return func(s *Client) {
+		s.samplingHandler = handler
+	}
+}
+
 func WithClientInfo(info protocol.Implementation) Option {
 	return func(s *Client) {
 		s.clientInfo = &info
@@ -43,6 +49,8 @@ type Client struct {
 	transport transport.ClientTransport
 
 	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
+
+	samplingHandler SamplingHandler
 
 	notifyHandler NotifyHandler
 
@@ -86,6 +94,10 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		h := NewBaseNotifyHandler()
 		h.Logger = client.logger
 		client.notifyHandler = h
+	}
+
+	if client.samplingHandler != nil {
+		client.clientCapabilities.Sampling = struct{}{}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), client.initTimeout)

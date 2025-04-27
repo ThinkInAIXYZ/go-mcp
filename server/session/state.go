@@ -53,6 +53,10 @@ func (s *State) SetClientInfo(ClientInfo *protocol.Implementation, ClientCapabil
 	s.clientCapabilities = ClientCapabilities
 }
 
+func (s *State) GetClientCapabilities() *protocol.ClientCapabilities {
+	return s.clientCapabilities
+}
+
 func (s *State) SetReceivedInitRequest() {
 	s.receivedInitRequest.Store(true)
 }

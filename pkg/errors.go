@@ -6,6 +6,7 @@ import (
 )
 
 var (
+	ErrClientNotSupport          = errors.New("this feature client not support")
 	ErrServerNotSupport          = errors.New("this feature server not support")
 	ErrRequestInvalid            = errors.New("request invalid")
 	ErrLackResponseChan          = errors.New("lack response chan")
