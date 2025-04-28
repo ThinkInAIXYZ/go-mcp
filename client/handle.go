@@ -18,10 +18,8 @@ func (client *Client) handleRequestWithCreateMessagesSampling(ctx context.Contex
 	}
 
 	var request *protocol.CreateMessageRequest
-	if len(rawParams) > 0 {
-		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
-			return nil, err
-		}
+	if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
+		return nil, err
 	}
 
 	return client.samplingHandler.CreateMessage(ctx, request)

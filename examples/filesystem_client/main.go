@@ -130,7 +130,7 @@ func main() {
 // Helper function to print tool results
 func printToolResult(result *protocol.CallToolResult) {
 	for _, content := range result.Content {
-		if textContent, ok := content.(protocol.TextContent); ok {
+		if textContent, ok := content.(*protocol.TextContent); ok {
 			log.Println(textContent.Text)
 		} else {
 			jsonBytes, _ := json.MarshalIndent(content, "", "  ")

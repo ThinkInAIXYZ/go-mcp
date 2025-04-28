@@ -21,7 +21,7 @@ func TestStreamableHTTPWithStateless(t *testing.T) {
 		t.Fatalf("Failed to create transport client: %v", err)
 	}
 
-	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateless) }, transportClient)
+	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateless) }, transportClient, transport.Stateless)
 }
 
 func TestStreamableHTTPWithStateful(t *testing.T) {
@@ -35,7 +35,7 @@ func TestStreamableHTTPWithStateful(t *testing.T) {
 		t.Fatalf("Failed to create transport client: %v", err)
 	}
 
-	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateful) }, transportClient)
+	test(t, func() error { return runStreamableHTTPServer(port, transport.Stateful) }, transportClient, transport.Stateful)
 }
 
 func runStreamableHTTPServer(port int, stateful transport.StateMode) error {

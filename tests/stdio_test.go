@@ -28,5 +28,5 @@ func TestStdio(t *testing.T) {
 	test(t, func() error {
 		<-make(chan error)
 		return nil
-	}, transportClient)
+	}, transportClient, transport.Stateful)
 }

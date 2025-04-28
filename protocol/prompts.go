@@ -60,28 +60,28 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 	}
 
 	// Try to unmarshal content as TextContent first
-	var textContent TextContent
+	var textContent *TextContent
 	if err := pkg.JSONUnmarshal(aux.Content, &textContent); err == nil {
 		m.Content = textContent
 		return nil
 	}
 
 	// Try to unmarshal content as ImageContent
-	var imageContent ImageContent
+	var imageContent *ImageContent
 	if err := pkg.JSONUnmarshal(aux.Content, &imageContent); err == nil {
 		m.Content = imageContent
 		return nil
 	}
 
 	// Try to unmarshal content as AudioContent
-	var audioContent AudioContent
+	var audioContent *AudioContent
 	if err := pkg.JSONUnmarshal(aux.Content, &audioContent); err == nil {
 		m.Content = audioContent
 		return nil
 	}
 
 	// Try to unmarshal content as embeddedResource
-	var embeddedResource EmbeddedResource
+	var embeddedResource *EmbeddedResource
 	if err := pkg.JSONUnmarshal(aux.Content, &embeddedResource); err == nil {
 		m.Content = embeddedResource
 		return nil

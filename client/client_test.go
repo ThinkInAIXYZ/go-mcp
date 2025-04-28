@@ -73,7 +73,7 @@ func TestClientCall(t *testing.T) {
 			expectedResponse: protocol.NewGetPromptResult([]protocol.PromptMessage{
 				{
 					Role:    protocol.RoleUser,
-					Content: protocol.TextContent{Type: "text", Text: "prompt content"},
+					Content: &protocol.TextContent{Type: "text", Text: "prompt content"},
 				},
 			}, "test description"),
 		},
@@ -148,7 +148,7 @@ func TestClientCall(t *testing.T) {
 			request: protocol.NewCallToolRequest("test_tool", map[string]interface{}{
 				"a": 1,
 			}),
-			expectedResponse: protocol.NewCallToolResult([]protocol.Content{protocol.TextContent{Type: "text", Text: "success"}}, false),
+			expectedResponse: protocol.NewCallToolResult([]protocol.Content{&protocol.TextContent{Type: "text", Text: "success"}}, false),
 		},
 	}
 

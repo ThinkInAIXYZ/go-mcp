@@ -22,7 +22,7 @@ func TestSSE(t *testing.T) {
 		t.Fatalf("Failed to create transport client: %v", err)
 	}
 
-	test(t, func() error { return runSSEServer(port) }, transportClient)
+	test(t, func() error { return runSSEServer(port) }, transportClient, transport.Stateful)
 }
 
 // getAvailablePort returns a port that is available for use

@@ -219,6 +219,7 @@ Currently supported transport methods:
 ![Transport Methods](docs/images/img_1.png)
 
 - **HTTP SSE/POST**: HTTP-based server push and client requests, suitable for web scenarios
+- **Streamable HTTP**: Supports HTTP POST/GET requests with both stateless and stateful modes, where stateful mode utilizes SSE for multi-message streaming to enable server-to-client notifications and requests
 - **Stdio**: Standard input/output stream-based, suitable for local inter-process communication
 
 The transport layer uses a unified interface abstraction, making it simple to add new transport methods (like Streamable HTTP, WebSocket, gRPC) without affecting upper-layer code.

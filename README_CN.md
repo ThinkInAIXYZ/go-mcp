@@ -220,6 +220,7 @@ Go-MCP 采用优雅的三层架构设计：
 ![传输方式](docs/images/img_1.png)
 
 - **HTTP SSE/POST**：基于 HTTP 的服务器推送和客户端请求，适用于 Web 场景
+- **Streamable HTTP**：使用 HTTP POST&GET 请求，支持 stateless 和 stateful 两种模式，stateful 模式使用 SSE 进行多消息流式传输，以支持服务器到客户端的通知和请求。
 - **Stdio**：基于进程标准输入输出流，适用于本地进程间通信
 
 传输层采用统一的接口抽象，使得新增传输方式（如 Streamable HTTP、WebSocket、gRPC）变得简单直接，且不影响上层代码。

@@ -17,7 +17,7 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
-func test(t *testing.T, runServer func() error, transportClient transport.ClientTransport) {
+func test(t *testing.T, runServer func() error, transportClient transport.ClientTransport, mode transport.StateMode) {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- runServer()
@@ -27,7 +27,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	select {
 	case err := <-errCh:
 		t.Fatalf("server.Run() failed: %v", err)
-	case <-time.After(time.Second * 5):
+	case <-time.After(time.Second * 3):
 		// Server started normally
 	}
 
@@ -35,7 +35,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	mcpClient, err := client.NewClient(transportClient, client.WithClientInfo(protocol.Implementation{
 		Name:    "Example MCP Client",
 		Version: "1.0.0",
-	}))
+	}), client.WithSamplingHandler(&sampling{}))
 	if err != nil {
 		t.Fatalf("Failed to create MCP client: %v", err)
 	}
@@ -54,7 +54,6 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	bytes, _ := json.Marshal(toolsResult)
 	fmt.Printf("Available tools: %s\n", bytes)
 
-	// Call tool
 	callResult, err := mcpClient.CallTool(
 		context.Background(),
 		protocol.NewCallToolRequestWithRawArguments("current_time", json.RawMessage(`{"timezone": "UTC"}`)))
@@ -63,6 +62,46 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	}
 	bytes, _ = json.Marshal(callResult)
 	fmt.Printf("Tool call result: %s\n", bytes)
+
+	if mode == transport.Stateful {
+		// if streamable_http transport, need wait streamable_http connection start
+		time.Sleep(time.Second)
+
+		callResult, err = mcpClient.CallTool(
+			context.Background(),
+			protocol.NewCallToolRequestWithRawArguments("delete_file", json.RawMessage(`{"file_name": "test_file.txt"}`)))
+		if err != nil {
+			t.Fatalf("Failed to call tool: %v", err)
+		}
+		bytes, _ = json.Marshal(callResult)
+		fmt.Printf("Tool call result: %s\n", bytes)
+	}
+}
+
+type sampling struct{}
+
+func (s *sampling) CreateMessage(_ context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error) {
+	var lastUserMessages protocol.Content
+	for _, message := range request.Messages {
+		if message.Role == "user" {
+			lastUserMessages = message.Content
+		}
+	}
+
+	if lastUserMessages.GetType() != "text" {
+		return nil, fmt.Errorf("expected 'text', got %s", lastUserMessages.GetType())
+	}
+
+	return &protocol.CreateMessageResult{
+		Content: &protocol.TextContent{
+			Annotated: protocol.Annotated{},
+			Type:      "text",
+			Text:      strconv.FormatBool(true),
+		},
+		Role:       "assistant",
+		Model:      "stub-model",
+		StopReason: "endTurn",
+	}, nil
 }
 
 func compileMockStdioServerTr() (string, error) {

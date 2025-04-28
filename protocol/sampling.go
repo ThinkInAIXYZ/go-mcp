@@ -1,5 +1,12 @@
 package protocol
 
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/ThinkInAIXYZ/go-mcp/pkg"
+)
+
 // CreateMessageRequest represents a request to create a message through sampling
 type CreateMessageRequest struct {
 	Messages         []SamplingMessage      `json:"messages"`
@@ -17,12 +24,86 @@ type SamplingMessage struct {
 	Content Content `json:"content"`
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface for SamplingMessage
+func (r *SamplingMessage) UnmarshalJSON(data []byte) error {
+	type Alias SamplingMessage
+	aux := &struct {
+		Content json.RawMessage `json:"content"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := pkg.JSONUnmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Try to unmarshal content as TextContent first
+	var textContent *TextContent
+	if err := pkg.JSONUnmarshal(aux.Content, &textContent); err == nil {
+		r.Content = textContent
+		return nil
+	}
+
+	// Try to unmarshal content as ImageContent
+	var imageContent *ImageContent
+	if err := pkg.JSONUnmarshal(aux.Content, &imageContent); err == nil {
+		r.Content = imageContent
+		return nil
+	}
+
+	// Try to unmarshal content as AudioContent
+	var audioContent *AudioContent
+	if err := pkg.JSONUnmarshal(aux.Content, &audioContent); err == nil {
+		r.Content = audioContent
+		return nil
+	}
+
+	return fmt.Errorf("unknown content type, content=%s", aux.Content)
+}
+
 // CreateMessageResult represents the response to a create message request
 type CreateMessageResult struct {
 	Content    Content `json:"content"`
 	Role       Role    `json:"role"`
 	Model      string  `json:"model"`
 	StopReason string  `json:"stopReason,omitempty"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface for CreateMessageResult
+func (r *CreateMessageResult) UnmarshalJSON(data []byte) error {
+	type Alias CreateMessageResult
+	aux := &struct {
+		Content json.RawMessage `json:"content"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := pkg.JSONUnmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	// Try to unmarshal content as TextContent first
+	var textContent *TextContent
+	if err := pkg.JSONUnmarshal(aux.Content, &textContent); err == nil {
+		r.Content = textContent
+		return nil
+	}
+
+	// Try to unmarshal content as ImageContent
+	var imageContent *ImageContent
+	if err := pkg.JSONUnmarshal(aux.Content, &imageContent); err == nil {
+		r.Content = imageContent
+		return nil
+	}
+
+	// Try to unmarshal content as AudioContent
+	var audioContent *AudioContent
+	if err := pkg.JSONUnmarshal(aux.Content, &audioContent); err == nil {
+		r.Content = audioContent
+		return nil
+	}
+
+	return fmt.Errorf("unknown content type, content=%s", aux.Content)
 }
 
 // NewCreateMessageRequest creates a new create message request

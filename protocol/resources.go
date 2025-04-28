@@ -172,7 +172,7 @@ type TextContent struct {
 	Text string `json:"text"`
 }
 
-func (t TextContent) GetType() string {
+func (t *TextContent) GetType() string {
 	return "text"
 }
 
@@ -183,7 +183,7 @@ type ImageContent struct {
 	MimeType string `json:"mimeType"`
 }
 
-func (i ImageContent) GetType() string {
+func (i *ImageContent) GetType() string {
 	return "image"
 }
 
@@ -194,7 +194,7 @@ type AudioContent struct {
 	MimeType string `json:"mimeType"`
 }
 
-func (i AudioContent) GetType() string {
+func (i *AudioContent) GetType() string {
 	return "audio"
 }
 
@@ -215,7 +215,7 @@ func NewEmbeddedResource(resource ResourceContents, annotations *Annotations) *E
 	}
 }
 
-func (i EmbeddedResource) GetType() string {
+func (i *EmbeddedResource) GetType() string {
 	return "resource"
 }
 

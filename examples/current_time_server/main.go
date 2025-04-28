@@ -103,7 +103,7 @@ func currentTime(_ context.Context, request *protocol.CallToolRequest) (*protoco
 
 	return &protocol.CallToolResult{
 		Content: []protocol.Content{
-			protocol.TextContent{
+			&protocol.TextContent{
 				Type: "text",
 				Text: text,
 			},

@@ -138,28 +138,28 @@ func (r *CallToolResult) UnmarshalJSON(data []byte) error {
 	r.Content = make([]Content, len(aux.Content))
 	for i, content := range aux.Content {
 		// Try to unmarshal content as TextContent first
-		var textContent TextContent
+		var textContent *TextContent
 		if err := pkg.JSONUnmarshal(content, &textContent); err == nil {
 			r.Content[i] = textContent
 			continue
 		}
 
 		// Try to unmarshal content as ImageContent
-		var imageContent ImageContent
+		var imageContent *ImageContent
 		if err := pkg.JSONUnmarshal(content, &imageContent); err == nil {
 			r.Content[i] = imageContent
 			continue
 		}
 
 		// Try to unmarshal content as AudioContent
-		var audioContent AudioContent
+		var audioContent *AudioContent
 		if err := pkg.JSONUnmarshal(content, &audioContent); err == nil {
 			r.Content[i] = audioContent
 			continue
 		}
 
 		// Try to unmarshal content as embeddedResource
-		var embeddedResource EmbeddedResource
+		var embeddedResource *EmbeddedResource
 		if err := pkg.JSONUnmarshal(content, &embeddedResource); err == nil {
 			r.Content[i] = embeddedResource
 			return nil

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -19,9 +20,16 @@ type currentTimeReq struct {
 	Timezone string `json:"timezone" description:"current time timezone"`
 }
 
+type deleteFileReq struct {
+	FileName string `json:"file_name" description:"file name"`
+}
+
+var srv *server.Server
+
 func main() {
 	// new mcp server with stdio or sse transport
-	srv, err := server.NewServer(
+	var err error
+	srv, err = server.NewServer(
 		getTransport(),
 		server.WithServerInfo(protocol.Implementation{
 			Name:    "current-time-v2-server",
@@ -32,14 +40,21 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	tool, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
+	tool1, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
+	if err != nil {
+		log.Fatalf("Failed to create tool: %v", err)
+		return
+	}
+
+	tool2, err := protocol.NewTool("delete_file", "delete file", deleteFileReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
 
 	// register tool and start mcp server
-	srv.RegisterTool(tool, currentTime)
+	srv.RegisterTool(tool1, currentTime)
+	srv.RegisterTool(tool2, deleteFile)
 	// srv.RegisterResource()
 	// srv.RegisterPrompt()
 	// srv.RegisterResourceTemplate()
@@ -66,7 +81,7 @@ func getTransport() (t transport.ServerTransport) {
 	var mode, port, stateMode string
 	flag.StringVar(&mode, "transport", "streamable_http", "The transport to use, should be \"stdio\" or \"sse\" or \"streamable_http\"")
 	flag.StringVar(&port, "port", "8080", "sse server address")
-	flag.StringVar(&stateMode, "state_mode", "stateless", "streamable_http server state mode, should be \"stateless\" or \"stateful\"")
+	flag.StringVar(&stateMode, "state_mode", "stateful", "streamable_http server state mode, should be \"stateless\" or \"stateful\"")
 	flag.Parse()
 
 	switch mode {
@@ -102,12 +117,64 @@ func currentTime(_ context.Context, request *protocol.CallToolRequest) (*protoco
 
 	return &protocol.CallToolResult{
 		Content: []protocol.Content{
-			protocol.TextContent{
+			&protocol.TextContent{
 				Type: "text",
 				Text: text,
 			},
 		},
 	}, nil
+}
+
+func deleteFile(ctx context.Context, request *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	req := new(deleteFileReq)
+	if err := protocol.VerifyAndUnmarshal(request.RawArguments, &req); err != nil {
+		return nil, err
+	}
+
+	if err := requestConfirm(ctx); err != nil {
+		return nil, err
+	}
+
+	return &protocol.CallToolResult{
+		Content: []protocol.Content{
+			&protocol.TextContent{
+				Type: "text",
+				Text: fmt.Sprintf("delete file %s successfully", req.FileName),
+			},
+		},
+	}, nil
+}
+
+func requestConfirm(ctx context.Context) error {
+	resp, err := srv.Sampling(ctx, &protocol.CreateMessageRequest{
+		Messages: []protocol.SamplingMessage{
+			{
+				Role: "user",
+				Content: &protocol.TextContent{
+					Type: "text",
+					Text: "您确定要删除文件「${file_name}」吗？请回复\"是\"或\"否\"。?",
+				},
+			},
+		},
+		MaxTokens:      10,
+		Temperature:    0.1,
+		SystemPrompt:   "你是一个帮助用户确认是否删除文件的助手。请只回复'是'或'否'。",
+		IncludeContext: "none",
+	})
+	if err != nil {
+		return err
+	}
+
+	// 判断用户返回
+	if resp.Content.GetType() != "text" {
+		return errors.New("type is not text")
+	}
+	respContent := resp.Content.(*protocol.TextContent)
+
+	if respContent.Text != "true" {
+		return errors.New("respContent.Text !=true")
+	}
+	return nil
 }
 
 func signalWaiter(errCh chan error) error {
