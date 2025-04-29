@@ -130,7 +130,7 @@ func main() {
 	}
 }
 
-func handleTimeRequest(req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func handleTimeRequest(_ context.Context,req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	var timeReq TimeRequest
 	if err := protocol.VerifyAndUnmarshal(req.RawArguments, &timeReq); err != nil {
 		return nil, err
