@@ -80,7 +80,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to list tools: %v", err)
 	}
-	log.Printf("Available tools: %+v", tools)
+	
+	jsonBytes, err := json.MarshalIndent(tools, "", "  ")
+	if err != nil {
+		log.Fatalf("Failed to marshal tools: %v", err)
+	}
+	fmt.Println(string(jsonBytes))
 }
 ```
 
