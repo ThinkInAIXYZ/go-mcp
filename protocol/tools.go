@@ -8,12 +8,14 @@ import (
 )
 
 // ListToolsRequest represents a request to list available tools
-type ListToolsRequest struct{}
+type ListToolsRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListToolsResult represents the response to a list tools request
 type ListToolsResult struct {
 	Tools      []*Tool `json:"tools"`
-	NextCursor string  `json:"nextCursor,omitempty"`
+	NextCursor Cursor  `json:"nextCursor,omitempty"`
 }
 
 // Tool represents a tool definition that the client can call
@@ -28,6 +30,14 @@ type Tool struct {
 	InputSchema InputSchema `json:"inputSchema"`
 
 	RawInputSchema json.RawMessage `json:"-"`
+}
+
+/*func (t *Tool) GetName() string {
+	return t.Name
+}*/
+
+func (t *Tool) GetName() string {
+	return t.Name
 }
 
 func (t *Tool) MarshalJSON() ([]byte, error) {
@@ -204,7 +214,7 @@ func NewListToolsRequest() *ListToolsRequest {
 }
 
 // NewListToolsResult creates a new list tools response
-func NewListToolsResult(tools []*Tool, nextCursor string) *ListToolsResult {
+func NewListToolsResult(tools []*Tool, nextCursor Cursor) *ListToolsResult {
 	return &ListToolsResult{
 		Tools:      tools,
 		NextCursor: nextCursor,

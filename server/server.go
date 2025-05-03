@@ -44,6 +44,12 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+func WithPagination(limit int) Option {
+	return func(s *Server) {
+		s.paginationLimit = limit
+	}
+}
+
 type Server struct {
 	transport transport.ServerTransport
 
@@ -60,6 +66,8 @@ type Server struct {
 	capabilities *protocol.ServerCapabilities
 	serverInfo   *protocol.Implementation
 	instructions string
+
+	paginationLimit int
 
 	logger pkg.Logger
 }

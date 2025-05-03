@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"reflect"
 	"testing"
@@ -504,5 +505,229 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 	}
 	if _, err := in.Write(append(notifyBytes, "\n"...)); err != nil {
 		t.Fatalf("in Write: %+v", err)
+	}
+}
+
+func TestServerHandleForPage(t *testing.T) {
+	reader1, writer1 := io.Pipe()
+	reader2, writer2 := io.Pipe()
+
+	var (
+		in = struct {
+			reader io.ReadCloser
+			writer io.WriteCloser
+		}{
+			reader: reader1,
+			writer: writer1,
+		}
+
+		out = struct {
+			reader io.ReadCloser
+			writer io.WriteCloser
+		}{
+			reader: reader2,
+			writer: writer2,
+		}
+
+		outScan = bufio.NewScanner(out.reader)
+	)
+
+	server, err := NewServer(
+		transport.NewMockServerTransport(in.reader, out.writer),
+		WithServerInfo(protocol.Implementation{
+			Name:    "ExampleServer",
+			Version: "1.0.0",
+		}),
+		WithPagination(5),
+	)
+	if err != nil {
+		t.Fatalf("NewServer: %+v", err)
+	}
+	total := 10
+	// add tool
+	for i := 0; i < total; i++ {
+		testTool, err := protocol.NewTool(fmt.Sprintf("test_tool_%d", i), fmt.Sprintf("test_tool_%d", i), currentTimeReq{})
+		if err != nil {
+			t.Fatalf("NewTool: %+v", err)
+			return
+		}
+
+		testToolCallContent := &protocol.TextContent{
+			Type: "text",
+			Text: fmt.Sprintf("pong_%d", i),
+		}
+		server.RegisterTool(testTool, func(_ context.Context, _ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			return &protocol.CallToolResult{
+				Content: []protocol.Content{testToolCallContent},
+			}, nil
+		})
+	}
+
+	// add prompt
+	for i := 0; i < total; i++ {
+		testPrompt := &protocol.Prompt{
+			Name:        fmt.Sprintf("test_prompt_%d", i),
+			Description: fmt.Sprintf("test_prompt_description_%d", i),
+			Arguments: []protocol.PromptArgument{
+				{
+					Name:        "params1",
+					Description: "params1's description",
+					Required:    true,
+				},
+			},
+		}
+		testPromptGetResponse := &protocol.GetPromptResult{
+			Description: fmt.Sprintf("test_prompt_description_%d", i),
+		}
+		server.RegisterPrompt(testPrompt, func(context.Context, *protocol.GetPromptRequest) (*protocol.GetPromptResult, error) {
+			return testPromptGetResponse, nil
+		})
+	}
+	// add resource
+	for i := 0; i < total; i++ {
+		testResource := &protocol.Resource{
+			URI:      fmt.Sprintf("file:///test%d.txt", i),
+			Name:     fmt.Sprintf("test%d.txt", i),
+			MimeType: "text/plain-txt",
+		}
+		testResourceContent := protocol.TextResourceContents{
+			URI:      testResource.URI,
+			MimeType: testResource.MimeType,
+			Text:     fmt.Sprintf("test%d", i),
+		}
+		server.RegisterResource(testResource, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
+			return &protocol.ReadResourceResult{
+				Contents: []protocol.ResourceContents{
+					testResourceContent,
+				},
+			}, nil
+		})
+	}
+	// add resource template
+	for i := 0; i < total; i++ {
+		testResourceTemplate := &protocol.ResourceTemplate{
+			URITemplate: fmt.Sprintf("file:///{path}/%d", i),
+			Name:        fmt.Sprintf("test_%d", i),
+		}
+		testResourceContent := protocol.TextResourceContents{
+			URI:      fmt.Sprintf("file:///test%d.txt", i),
+			MimeType: "text/plain-txt",
+			Text:     fmt.Sprintf("test%d", i),
+		}
+		if err := server.RegisterResourceTemplate(testResourceTemplate, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
+			return &protocol.ReadResourceResult{
+				Contents: []protocol.ResourceContents{
+					testResourceContent,
+				},
+			}, nil
+		}); err != nil {
+			t.Fatalf("RegisterResourceTemplate: %+v", err)
+			return
+		}
+	}
+	go func() {
+		if err := server.Run(); err != nil {
+			t.Errorf("server start: %+v", err)
+		}
+	}()
+
+	testServerInit(t, server, in.writer, outScan)
+
+	tests := []struct {
+		name             string
+		method           protocol.Method
+		request          protocol.ClientRequest
+		expectedResponse protocol.ServerResponse
+	}{
+		{
+			name:             "test_list_tool",
+			method:           protocol.ToolsList,
+			request:          protocol.ListToolsRequest{},
+			expectedResponse: protocol.ListToolsResult{NextCursor: ""},
+		},
+		{
+			name:    "test_list_prompt",
+			method:  protocol.PromptsList,
+			request: protocol.ListPromptsRequest{},
+			expectedResponse: protocol.ListPromptsResult{
+				NextCursor: "",
+			},
+		},
+		{
+			name:    "test_list_resource",
+			method:  protocol.ResourcesList,
+			request: protocol.ListResourcesRequest{},
+			expectedResponse: protocol.ListResourcesResult{
+				NextCursor: "",
+			},
+		},
+		{
+			name:    "test_list_resource_template",
+			method:  protocol.ResourceListTemplates,
+			request: protocol.ListResourceTemplatesRequest{},
+			expectedResponse: protocol.ListResourceTemplatesResult{
+				NextCursor: "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uuid, _ := uuid.NewUUID()
+			totalResq := 0
+			req := protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
+			for i := 0; i < 3; i++ {
+				reqBytes, err := json.Marshal(req)
+				if err != nil {
+					t.Fatalf("json Marshal: %+v", err)
+				}
+				if _, err = in.writer.Write(append(reqBytes, "\n"...)); err != nil {
+					t.Fatalf("in Write: %+v", err)
+				}
+
+				var respBytes []byte
+				if outScan.Scan() {
+					respBytes = outScan.Bytes()
+					if outScan.Err() != nil {
+						t.Fatalf("outScan: %+v", err)
+					}
+				}
+				respStruct := struct {
+					Jsonrpc string      `json:"jsonrpc"`
+					ID      interface{} `json:"id"`
+					Result  struct {
+						NextCursor        string        `json:"nextCursor"`
+						Tools             []interface{} `json:"tools"`
+						Prompts           []interface{} `json:"prompts"`
+						Resources         []interface{} `json:"resources"`
+						ResourceTemplates []interface{} `json:"resourceTemplates"`
+					} `json:"result"`
+				}{}
+				if err = pkg.JSONUnmarshal(respBytes, &respStruct); err != nil {
+					t.Fatal(err)
+				}
+
+				if respStruct.Result.NextCursor == "" {
+					break
+				}
+				switch tt.method {
+				case protocol.ToolsList:
+					tt.request = protocol.ListToolsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.PromptsList:
+					tt.request = protocol.ListPromptsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.ResourceListTemplates:
+					tt.request = protocol.ListResourceTemplatesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				case protocol.ResourcesList:
+					tt.request = protocol.ListResourcesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+				}
+				req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
+				totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
+					len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
+			}
+			if total != totalResq {
+				t.Fatalf("totalResq: %d, total: %d", totalResq, total)
+			}
+			// t.Logf("totalResq: %d,total:%d", totalResq, total)
+		})
 	}
 }
