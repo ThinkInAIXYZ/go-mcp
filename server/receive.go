@@ -20,19 +20,6 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, pkg.ErrLackSession
 	}
 
-	if !gjson.GetBytes(msg, "id").Exists() {
-		notify := &protocol.JSONRPCNotification{}
-		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {
-			return nil, err
-		}
-		if err := server.receiveNotify(sessionID, notify); err != nil {
-			notify.RawParams = nil // simplified log
-			server.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
-			return nil, err
-		}
-		return nil, nil
-	}
-
 	// case request or response
 	if !gjson.GetBytes(msg, "method").Exists() {
 		resp := &protocol.JSONRPCResponse{}
@@ -52,6 +39,20 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 	if err := pkg.JSONUnmarshal(msg, &req); err != nil {
 		return nil, err
 	}
+
+	if req.Method == protocol.NotificationInitialized {
+		notify := &protocol.JSONRPCNotification{}
+		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {
+			return nil, err
+		}
+		if err := server.receiveNotify(sessionID, notify); err != nil {
+			notify.RawParams = nil // simplified log
+			server.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
+			return nil, err
+		}
+		return nil, nil
+	}
+
 	if !req.IsValid() {
 		return nil, pkg.ErrRequestInvalid
 	}
