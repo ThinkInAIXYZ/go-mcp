@@ -57,10 +57,8 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 	}
 
 	if sessionID != "" && req.Method != protocol.Initialize && req.Method != protocol.Ping {
-		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
+		if _, ok := server.sessionManager.GetSession(sessionID); !ok {
 			return nil, pkg.ErrLackSession
-		} else if !s.GetReady() {
-			return nil, pkg.ErrSessionHasNotInitialized
 		}
 	}
 
