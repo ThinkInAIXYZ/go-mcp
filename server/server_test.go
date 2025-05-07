@@ -7,11 +7,13 @@ import (
 	"io"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
 
@@ -504,5 +506,202 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 	}
 	if _, err := in.Write(append(notifyBytes, "\n"...)); err != nil {
 		t.Fatalf("in Write: %+v", err)
+	}
+}
+
+type testLimiter struct {
+	name               string
+	rate               components.Rate
+	numRequests        int
+	requestInterval    time.Duration // Interval between requests
+	expectedErrorCount int
+	description        string
+}
+
+func TestServerRateLimiters(t *testing.T) {
+	tests := []testLimiter{
+		{
+			name: "rapid_requests_exceed_burst",
+			rate: components.Rate{
+				Limit: 5.0,
+				Burst: 10,
+			},
+			numRequests:        15,
+			requestInterval:    0, // No delay between requests
+			expectedErrorCount: 5,
+			description:        "Sending requests rapidly should exceed burst limit and trigger rate limiting",
+		},
+		{
+			name: "slow_requests_under_limit",
+			rate: components.Rate{
+				Limit: 5.0,
+				Burst: 5,
+			},
+			numRequests:        10,
+			requestInterval:    210 * time.Millisecond, // ~4.7 req/s, under the 5.0 limit
+			expectedErrorCount: 0,
+			description:        "Sending requests under the rate limit should not trigger rate limiting",
+		},
+		{
+			name: "mixed_rate_pattern",
+			rate: components.Rate{
+				Limit: 10.0,
+				Burst: 5,
+			},
+			numRequests:        20,
+			requestInterval:    50 * time.Millisecond, // 20 req/s, above the 10.0 limit
+			expectedErrorCount: 5,
+			description:        "Sending requests at a rate higher than limit should trigger rate limiting after burst is consumed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testServerRateLimiter(t, tt)
+		})
+	}
+}
+
+func testServerRateLimiter(t *testing.T, tt testLimiter) {
+	// Set up pipes for communication
+	reader1, writer1 := io.Pipe()
+	reader2, writer2 := io.Pipe()
+
+	var (
+		in = struct {
+			reader io.ReadCloser
+			writer io.WriteCloser
+		}{
+			reader: reader1,
+			writer: writer1,
+		}
+
+		out = struct {
+			reader io.ReadCloser
+			writer io.WriteCloser
+		}{
+			reader: reader2,
+			writer: writer2,
+		}
+
+		outScan = bufio.NewScanner(out.reader)
+	)
+
+	// Create server with rate limiter
+	server, err := NewServer(
+		transport.NewMockServerTransport(in.reader, out.writer),
+		WithServerInfo(protocol.Implementation{
+			Name:    "ExampleServer",
+			Version: "1.0.0",
+		}),
+		WithRateLimiter(components.NewTokenBucketLimiter(tt.rate)),
+	)
+	if err != nil {
+		t.Fatalf("NewServer: %+v", err)
+	}
+
+	// Register test tool
+	testTool, err := protocol.NewTool("test_tool", "test_tool", currentTimeReq{})
+	if err != nil {
+		t.Fatalf("NewTool: %+v", err)
+		return
+	}
+	testToolCallContent := protocol.TextContent{
+		Type: "text",
+		Text: "pong",
+	}
+
+	// Add minimal processing delay to simulate real-world scenario
+	server.RegisterTool(testTool, func(_ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+		time.Sleep(5 * time.Millisecond) // Small processing delay
+		return &protocol.CallToolResult{
+			Content: []protocol.Content{testToolCallContent},
+		}, nil
+	})
+
+	// Start server
+	serverErrCh := make(chan error, 1)
+	go func() {
+		if err := server.Run(); err != nil {
+			serverErrCh <- err
+		}
+	}()
+
+	// Initialize server
+	testServerInit(t, server, in.writer, outScan)
+
+	// Test rate limiting by sending multiple requests
+	errorCount := 0
+	successCount := 0
+
+	for i := 0; i < tt.numRequests; i++ {
+		uuid, _ := uuid.NewUUID()
+		req := protocol.NewJSONRPCRequest(uuid, protocol.ToolsCall, protocol.CallToolRequest{
+			Name: testTool.Name,
+		})
+		reqBytes, err := json.Marshal(req)
+		if err != nil {
+			t.Fatalf("json Marshal: %+v", err)
+		}
+
+		if _, err = in.writer.Write(append(reqBytes, "\n"...)); err != nil {
+			t.Fatalf("in Write: %+v", err)
+		}
+
+		var respBytes []byte
+		if outScan.Scan() {
+			respBytes = outScan.Bytes()
+			if outScan.Err() != nil {
+				t.Fatalf("outScan: %+v", err)
+			}
+		}
+
+		var resp map[string]interface{}
+		if err = pkg.JSONUnmarshal(respBytes, &resp); err != nil {
+			t.Fatal(err)
+		}
+
+		// Check if response contains error
+		if errObj, exists := resp["error"]; exists {
+			errorObj, ok := errObj.(map[string]interface{})
+			if ok {
+				// Check if it's a rate limit error
+				if code, codeExists := errorObj["code"].(float64); codeExists && code == float64(-32603) {
+					errorCount++
+				}
+			}
+		} else {
+			successCount++
+		}
+
+		// Apply interval between requests if specified
+		if tt.requestInterval > 0 && i < tt.numRequests-1 {
+			time.Sleep(tt.requestInterval)
+		}
+	}
+
+	// duration := time.Since(startTime)
+
+	// Verify that we got the expected number of rate limit errors
+	if errorCount != tt.expectedErrorCount {
+		t.Errorf("Expected %d rate limit errors, got %d", tt.expectedErrorCount, errorCount)
+	}
+
+	// Verify that successful + errors = total requests
+	if successCount+errorCount != tt.numRequests {
+		t.Errorf("Request count mismatch: got %d successes + %d errors = %d, expected total %d",
+			successCount, errorCount, successCount+errorCount, tt.numRequests)
+	}
+
+	// Cleanup
+	in.writer.Close()
+	out.reader.Close()
+
+	// Check if server encountered errors
+	select {
+	case err := <-serverErrCh:
+		t.Fatalf("Server error: %v", err)
+	default:
+		// No error, continue
 	}
 }

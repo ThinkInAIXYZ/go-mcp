@@ -17,6 +17,7 @@ var (
 	ErrLackSession               = errors.New("lack session")
 	ErrSessionClosed             = errors.New("session closed")
 	ErrSendEOF                   = errors.New("send EOF")
+	ErrRateLimitExceeded         = errors.New("rate limit exceeded")
 )
 
 type ResponseError struct {

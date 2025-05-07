@@ -8,6 +8,7 @@ import (
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
+	"github.com/ThinkInAIXYZ/go-mcp/server/components"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
 	"github.com/ThinkInAIXYZ/go-mcp/transport"
 )
@@ -44,6 +45,24 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+// WithRateLimiter 添加一个创建带速率限制的服务器的选项
+func WithRateLimiter(limiter components.RateLimiter) Option {
+	return func(s *Server) {
+		s.limiter = limiter
+	}
+}
+
+// WithDefaultRateLimiter 添加一个便捷函数用默认参数创建限速器
+func WithDefaultRateLimiter() Option {
+	const defaultLimit = 5.0
+	const defaultBurst = 10
+	limiter := components.NewTokenBucketLimiter(components.Rate{
+		Limit: defaultLimit,
+		Burst: defaultBurst,
+	})
+	return WithRateLimiter(limiter)
+}
+
 type Server struct {
 	transport transport.ServerTransport
 
@@ -53,6 +72,7 @@ type Server struct {
 	resourceTemplates pkg.SyncMap[*resourceTemplateEntry]
 
 	sessionManager *session.Manager
+	limiter        components.RateLimiter
 
 	inShutdown   *pkg.AtomicBool // true when server is in shutdown
 	inFlyRequest sync.WaitGroup
@@ -246,3 +266,6 @@ func (server *Server) sessionDetection(ctx context.Context, sessionID string) er
 	}
 	return nil
 }
+
+// GetLimiter 获取限速器
+func (server *Server) GetLimiter() components.RateLimiter { return server.limiter }
