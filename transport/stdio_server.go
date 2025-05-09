@@ -21,9 +21,10 @@ func WithStdioServerOptionLogger(log pkg.Logger) StdioServerTransportOption {
 }
 
 type stdioServerTransport struct {
-	receiver serverReceiver
-	reader   io.ReadCloser
-	writer   io.Writer
+	receiver  serverReceiver
+	reader    io.ReadCloser
+	writer    io.Writer
+	writerror io.WriteCloser
 
 	sessionManager sessionManager
 	sessionID      string
@@ -36,9 +37,10 @@ type stdioServerTransport struct {
 
 func NewStdioServerTransport(opts ...StdioServerTransportOption) ServerTransport {
 	t := &stdioServerTransport{
-		reader: os.Stdin,
-		writer: os.Stdout,
-		logger: pkg.DefaultLogger,
+		reader:    os.Stdin,
+		writer:    os.Stdout,
+		writerror: os.Stderr,
+		logger:    pkg.DefaultLogger,
 
 		receiveShutDone: make(chan struct{}),
 	}
