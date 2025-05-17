@@ -22,6 +22,11 @@ func (server *Server) sendMsgWithRequest(ctx context.Context, sessionID string, 
 		return err
 	}
 
+	if ch, err := getSendChanFromCtx(ctx); err == nil {
+		ch <- message
+		return nil
+	}
+
 	if err := server.transport.Send(ctx, sessionID, message); err != nil {
 		return fmt.Errorf("sendRequest: transport send: %w", err)
 	}
@@ -34,6 +39,11 @@ func (server *Server) sendMsgWithNotification(ctx context.Context, sessionID str
 	message, err := json.Marshal(notify)
 	if err != nil {
 		return err
+	}
+
+	if ch, err := getSendChanFromCtx(ctx); err == nil {
+		ch <- message
+		return nil
 	}
 
 	if err := server.transport.Send(ctx, sessionID, message); err != nil {

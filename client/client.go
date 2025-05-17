@@ -50,6 +50,9 @@ type Client struct {
 
 	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
 
+	progressChanRW           sync.RWMutex
+	progressToken2notifyChan map[string]chan<- *protocol.ProgressNotification
+
 	samplingHandler SamplingHandler
 
 	notifyHandler NotifyHandler
@@ -75,14 +78,15 @@ type Client struct {
 
 func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 	client := &Client{
-		transport:          t,
-		reqID2respChan:     cmap.New[chan *protocol.JSONRPCResponse](),
-		ready:              pkg.NewAtomicBool(),
-		clientInfo:         &protocol.Implementation{},
-		clientCapabilities: &protocol.ClientCapabilities{},
-		initTimeout:        time.Second * 30,
-		closed:             make(chan struct{}),
-		logger:             pkg.DefaultLogger,
+		transport:                t,
+		reqID2respChan:           cmap.New[chan *protocol.JSONRPCResponse](),
+		progressToken2notifyChan: make(map[string]chan<- *protocol.ProgressNotification),
+		ready:                    pkg.NewAtomicBool(),
+		clientInfo:               &protocol.Implementation{},
+		clientCapabilities:       &protocol.ClientCapabilities{},
+		initTimeout:              time.Second * 30,
+		closed:                   make(chan struct{}),
+		logger:                   pkg.DefaultLogger,
 	}
 	t.SetReceiver(transport.ClientReceiverF(client.receive))
 

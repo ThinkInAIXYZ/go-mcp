@@ -75,7 +75,6 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 	var (
 		properties      = make(map[string]*Property)
 		requiredFields  = make([]string, 0)
-		enumValues      = make([]string, 0)
 		anonymousFields = make([]reflect.StructField, 0)
 	)
 
@@ -125,9 +124,9 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 		}
 
 		if v := field.Tag.Get("enum"); v != "" {
-			enumValues = strings.Split(v, ",")
-			for i := range enumValues {
-				enumValues[i] = strings.TrimSpace(enumValues[i])
+			enumValues := strings.Split(v, ",")
+			for j, value := range enumValues {
+				enumValues[j] = strings.TrimSpace(value)
 			}
 
 			// Check if enum values are consistent with the field type
@@ -169,7 +168,6 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 		Type:       ObjectT,
 		Properties: properties,
 		Required:   requiredFields,
-		Enum:       enumValues,
 	}
 	return property, nil
 }

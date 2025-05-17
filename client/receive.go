@@ -110,6 +110,8 @@ func (client *Client) receiveNotify(ctx context.Context, notify *protocol.JSONRP
 		return client.handleNotifyWithResourcesListChanged(ctx, notify.RawParams)
 	case protocol.NotificationResourcesUpdated:
 		return client.handleNotifyWithResourcesUpdated(ctx, notify.RawParams)
+	case protocol.NotificationProgress:
+		return client.handleNotifyWithProgress(ctx, notify.RawParams)
 	default:
 		return fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, notify.Method)
 	}

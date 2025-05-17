@@ -212,9 +212,7 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Disconnection SHOULD NOT be interpreted as the client canceling its request.
-	// To cancel, the client SHOULD explicitly send an MCP CancelledNotification.
-	ctx := pkg.NewCancelShieldContext(r.Context())
+	ctx := r.Context()
 
 	// For InitializeRequest HTTP response
 	if t.stateMode == Stateful {
@@ -237,19 +235,52 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	for msg := range outputMsgCh {
-		if t.stateMode == Stateful {
-			if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
-				w.Header().Set(sessionIDHeader, sid.SessionID)
-			}
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		t.writeError(w, http.StatusInternalServerError, "Streaming not supported")
+		return
+	}
 
-		if _, err = w.Write(msg); err != nil {
-			t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
-			return
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	if protocol.IsInitializedRequest(bs) { // 判断是否是init请求
+		msg := <-outputMsgCh
+		if t.stateMode == Stateful {
+			w.Header().Set(sessionIDHeader, ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn).SessionID)
 		}
+
+		if _, err = fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+			t.logger.Errorf("Failed to write message: %v", err)
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	go func() {
+		defer pkg.Recover()
+
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			if _, e := fmt.Fprintf(w, " : heartbeat\n\n"); e != nil {
+				t.logger.Errorf("Failed to write heartbeat: %v", e)
+				continue
+			}
+			flusher.Flush()
+		}
+	}()
+
+	for msg := range outputMsgCh {
+		if _, err = fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+			t.logger.Errorf("Failed to write message: %v", err)
+			continue
+		}
+		flusher.Flush()
 	}
 }
 

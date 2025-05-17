@@ -46,11 +46,11 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
-// ToolMiddleware 定义工具 handler 的中间件类型
-// 允许像链式调用一样包裹 ToolHandlerFunc
+// ToolMiddleware defines the middleware type of the tool handler
+// Allow ToolHandlerFunc to be wrapped like a chain call
 type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
 
-// RateLimitMiddleware 返回一个速率限制中间件
+// RateLimitMiddleware Return a rate-limiting middleware
 func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
 	return func(next ToolHandlerFunc) ToolHandlerFunc {
 		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {

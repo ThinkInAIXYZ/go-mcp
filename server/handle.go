@@ -41,12 +41,7 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		s.SetReceivedInitRequest()
 	}
 
-	return &protocol.InitializeResult{
-		ServerInfo:      *server.serverInfo,
-		Capabilities:    *server.capabilities,
-		ProtocolVersion: protocolVersion,
-		Instructions:    server.instructions,
-	}, nil
+	return protocol.NewInitializeResult(*server.serverInfo, *server.capabilities, protocolVersion, server.instructions), nil
 }
 
 func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*protocol.ListPromptsResult, error) {

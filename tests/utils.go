@@ -18,14 +18,14 @@ import (
 )
 
 func test(t *testing.T, runServer func() error, transportClient transport.ClientTransport, mode transport.StateMode) {
-	errCh := make(chan error, 1)
+	srvErrCh := make(chan error, 1)
 	go func() {
-		errCh <- runServer()
+		srvErrCh <- runServer()
 	}()
 
 	// Use select to handle potential errors
 	select {
-	case err := <-errCh:
+	case err := <-srvErrCh:
 		t.Fatalf("server.Run() failed: %v", err)
 	case <-time.After(time.Second * 3):
 		// Server started normally
@@ -57,6 +57,18 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	callResult, err := mcpClient.CallTool(
 		context.Background(),
 		protocol.NewCallToolRequestWithRawArguments("current_time", json.RawMessage(`{"timezone": "UTC"}`)))
+	if err != nil {
+		t.Fatalf("Failed to call tool: %v", err)
+	}
+	bytes, _ = json.Marshal(callResult)
+	fmt.Printf("Tool call result: %s\n", bytes)
+
+	progressCh := make(chan *protocol.ProgressNotification, 5)
+	callResult, err = mcpClient.CallToolWithProgressChan(context.Background(),
+		protocol.NewCallToolRequestWithRawArguments("generate_ppt", json.RawMessage(`{"ppt_description": "test"}`)), progressCh)
+	for progress := range progressCh {
+		fmt.Printf("Progress: %+v\n", progress)
+	}
 	if err != nil {
 		t.Fatalf("Failed to call tool: %v", err)
 	}

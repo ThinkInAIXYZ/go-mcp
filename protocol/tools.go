@@ -18,6 +18,26 @@ type ListToolsResult struct {
 	NextCursor Cursor  `json:"nextCursor,omitempty"`
 }
 
+// ToolAnnotations contains hints about the tool's behavior
+type ToolAnnotations struct {
+	// Title is a human-readable title for the tool, useful for UI display
+	Title string `json:"title,omitempty"`
+
+	// ReadOnlyHint indicates the tool does not modify its environment
+	ReadOnlyHint *bool `json:"readOnlyHint,omitempty"`
+
+	// DestructiveHint indicates the tool may perform destructive updates
+	// (only meaningful when ReadOnlyHint is false)
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
+
+	// IdempotentHint indicates calling the tool repeatedly with the same arguments
+	// has no additional effect (only meaningful when ReadOnlyHint is false)
+	IdempotentHint *bool `json:"idempotentHint,omitempty"`
+
+	// OpenWorldHint indicates the tool may interact with an "open world" of external entities
+	OpenWorldHint *bool `json:"openWorldHint,omitempty"`
+}
+
 // Tool represents a tool definition that the client can call
 type Tool struct {
 	// Name is the unique identifier of the tool
@@ -28,6 +48,9 @@ type Tool struct {
 
 	// InputSchema defines the expected parameters for the tool using JSON Schema
 	InputSchema InputSchema `json:"inputSchema"`
+
+	// Annotations provides additional hints about the tool's behavior
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
 
 	RawInputSchema json.RawMessage `json:"-"`
 }
@@ -41,7 +64,7 @@ func (t *Tool) GetName() string {
 }
 
 func (t *Tool) MarshalJSON() ([]byte, error) {
-	m := make(map[string]interface{}, 3)
+	m := make(map[string]interface{}, 4)
 
 	m["name"] = t.Name
 	if t.Description != "" {
@@ -57,6 +80,11 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 	} else {
 		// Use the structured InputSchema
 		m["inputSchema"] = t.InputSchema
+	}
+
+	// Add annotations if present
+	if t.Annotations != nil {
+		m["annotations"] = t.Annotations
 	}
 
 	return json.Marshal(m)
@@ -75,6 +103,7 @@ type InputSchema struct {
 
 // CallToolRequest represents a request to call a specific tool
 type CallToolRequest struct {
+	Meta         map[string]interface{} `json:"_meta,omitempty"`
 	Name         string                 `json:"name"`
 	Arguments    map[string]interface{} `json:"arguments,omitempty"`
 	RawArguments json.RawMessage        `json:"-"`

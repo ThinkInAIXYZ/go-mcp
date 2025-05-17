@@ -71,7 +71,7 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, errors.New("server already shutdown")
 	}
 
-	ch := make(chan []byte, 1)
+	ch := make(chan []byte, 5)
 	go func(ctx context.Context) {
 		defer pkg.Recover()
 		defer server.inFlyRequest.Done()
@@ -84,6 +84,12 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 			s.GetClientReqID2cancelFunc().Set(requestID, cancel)
 			defer s.GetClientReqID2cancelFunc().Remove(requestID)
 		}
+
+		if r := gjson.GetBytes(req.RawParams, fmt.Sprintf("_meta.%s", protocol.ProgressTokenKey)); r.Exists() {
+			ctx = setProgressTokenToCtx(ctx, r.Value())
+		}
+
+		ctx = setSendChanToCtx(ctx, ch)
 
 		resp := server.receiveRequest(ctx, sessionID, req)
 		if errors.Is(ctx.Err(), context.Canceled) {

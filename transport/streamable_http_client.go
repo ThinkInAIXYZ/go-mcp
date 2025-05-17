@@ -185,6 +185,11 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 
 			resp, err := t.client.Do(req)
 			if err != nil {
+				select {
+				case <-t.ctx.Done():
+					return
+				default:
+				}
 				t.logger.Errorf("failed to connect to SSE stream: %v", err)
 				continue
 			}

@@ -1,5 +1,11 @@
 package protocol
 
+import (
+	"encoding/json"
+
+	"github.com/tidwall/gjson"
+)
+
 // InitializeRequest represents the initialize request sent from client to server
 type InitializeRequest struct {
 	ClientInfo      Implementation     `json:"clientInfo"`
@@ -68,11 +74,11 @@ func NewInitializeRequest(clientInfo Implementation, capabilities ClientCapabili
 }
 
 // NewInitializeResult creates a new initialize response
-func NewInitializeResult(serverInfo Implementation, capabilities ServerCapabilities, instructions string) *InitializeResult {
+func NewInitializeResult(serverInfo Implementation, capabilities ServerCapabilities, version string, instructions string) *InitializeResult {
 	return &InitializeResult{
 		ServerInfo:      serverInfo,
 		Capabilities:    capabilities,
-		ProtocolVersion: Version,
+		ProtocolVersion: version,
 		Instructions:    instructions,
 	}
 }
@@ -80,4 +86,8 @@ func NewInitializeResult(serverInfo Implementation, capabilities ServerCapabilit
 // NewInitializedNotification creates a new initialized notification
 func NewInitializedNotification() *InitializedNotification {
 	return &InitializedNotification{}
+}
+
+func IsInitializedRequest(rawParams json.RawMessage) bool {
+	return gjson.ParseBytes(rawParams).Get("method").String() == string(Initialize)
 }
