@@ -12,7 +12,7 @@ import (
 )
 
 func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (*protocol.PingResult, error) {
-	sessionID, err := getSessionIDFromCtx(ctx)
+	sessionID, err := GetSessionIDFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 }
 
 func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error) {
-	sessionID, err := getSessionIDFromCtx(ctx)
+	sessionID, err := GetSessionIDFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
