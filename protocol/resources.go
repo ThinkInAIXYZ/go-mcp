@@ -210,6 +210,19 @@ func (i *AudioContent) GetType() string {
 	return "audio"
 }
 
+type ResourceLink struct {
+	Annotated
+	Type        string `json:"type"` // Must be "resource_link"
+	URI         string `json:"uri"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	MIMEType    string `json:"mimeType"`
+}
+
+func (r *ResourceLink) GetType() string {
+	return "resource_link"
+}
+
 // EmbeddedResource represents the contents of a resource, embedded into a prompt or tool call result.
 // It is up to the client how best to render embedded resources for the benefit of the LLM and/or the user.
 type EmbeddedResource struct {

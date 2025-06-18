@@ -197,6 +197,13 @@ func (r *CallToolResult) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
+		// Try to unmarshal content as ResourceLink
+		var resourceLink *ResourceLink
+		if err := pkg.JSONUnmarshal(content, &resourceLink); err == nil {
+			r.Content[i] = resourceLink
+			continue
+		}
+
 		// Try to unmarshal content as embeddedResource
 		var embeddedResource *EmbeddedResource
 		if err := pkg.JSONUnmarshal(content, &embeddedResource); err == nil {

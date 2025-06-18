@@ -86,6 +86,13 @@ func (m *PromptMessage) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
+	// Try to unmarshal content as ResourceLink
+	var resourceLink *ResourceLink
+	if err := pkg.JSONUnmarshal(aux.Content, &resourceLink); err == nil {
+		m.Content = resourceLink
+		return nil
+	}
+
 	// Try to unmarshal content as embeddedResource
 	var embeddedResource *EmbeddedResource
 	if err := pkg.JSONUnmarshal(aux.Content, &embeddedResource); err == nil {
