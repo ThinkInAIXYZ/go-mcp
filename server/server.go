@@ -96,6 +96,8 @@ type Server struct {
 	logger pkg.Logger
 
 	genSessionID func(ctx context.Context) string
+
+	globalMiddlewares []ToolMiddleware
 }
 
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
@@ -151,7 +153,10 @@ func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerF
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		toolHandler = middlewares[i](toolHandler)
 	}
-	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
+
+	finalHandler := server.buildMiddlewareChain(toolHandler)
+
+	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: finalHandler})
 	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification toll list changes fail: %v", err)
@@ -251,6 +256,25 @@ func (server *Server) UnregisterResourceTemplate(uriTemplate string) {
 			return
 		}
 	}
+}
+
+func (server *Server) Use(middlewares ...ToolMiddleware) {
+	server.globalMiddlewares = append(server.globalMiddlewares, middlewares...)
+}
+
+func (server *Server) buildMiddlewareChain(finalHandler ToolHandlerFunc) ToolHandlerFunc {
+	if len(server.globalMiddlewares) == 0 {
+		return finalHandler
+	}
+
+	handler := finalHandler
+	for i := len(server.globalMiddlewares) - 1; i >= 0; i-- {
+		middleware := server.globalMiddlewares[i]
+		currentHandler := handler
+		handler = middleware(currentHandler)
+	}
+
+	return handler
 }
 
 func (server *Server) Shutdown(userCtx context.Context) error {

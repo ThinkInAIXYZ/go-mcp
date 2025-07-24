@@ -111,6 +111,13 @@ func main() {
     log.Fatalf("建立 MCP 伺服器失敗: %v", err)
   }
 
+  // 可選：全域中介軟體（支援多個中介軟體參數）
+  // mcpServer.Use(
+  // 	LoggingMiddleware,
+  // 	AuthMiddleware,
+  // 	MetricsMiddleware,
+  // )
+
   // 註冊時間查詢工具
   tool, err := protocol.NewTool("current_time", "取得指定時區的目前時間", TimeRequest{})
   if err != nil {

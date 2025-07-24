@@ -112,6 +112,13 @@ func main() {
 		log.Fatalf("Failed to create MCP server: %v", err)
 	}
 
+	// Optional: Global middleware (variadic - multiple middleware supported)
+	// mcpServer.Use(
+	// 	LoggingMiddleware,
+	// 	AuthMiddleware,
+	// 	MetricsMiddleware,
+	// )
+
 	// Register time query tool
 	tool, err := protocol.NewTool("current_time", "Get current time for specified timezone", TimeRequest{})
 	if err != nil {

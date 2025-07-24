@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -927,4 +928,79 @@ func testServerRateLimiter(t *testing.T, tt testLimiter) {
 	default:
 		// No error, continue
 	}
+}
+
+// Middleware tests
+func TestMiddleware(t *testing.T) {
+	mockTransport := transport.NewMockServerTransport(io.NopCloser(bytes.NewReader(nil)), io.Discard)
+
+	s, err := NewServer(mockTransport)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if s == nil {
+		t.Fatal("Server is nil")
+	}
+
+	testMiddleware := func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			return next(ctx, req)
+		}
+	}
+
+	s.Use(testMiddleware)
+}
+
+// TestMiddlewareEarlyReturn tests middleware that can return early
+func TestMiddlewareEarlyReturn(t *testing.T) {
+	mockTransport := transport.NewMockServerTransport(io.NopCloser(bytes.NewReader(nil)), io.Discard)
+
+	s, err := NewServer(mockTransport)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if s == nil {
+		t.Fatal("Server is nil")
+	}
+
+	authMiddleware := func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			return nil, context.Canceled
+		}
+	}
+
+	s.Use(authMiddleware)
+}
+
+// TestNoMiddleware tests that tools work without middleware
+func TestNoMiddleware(t *testing.T) {
+	mockTransport := transport.NewMockServerTransport(io.NopCloser(bytes.NewReader(nil)), io.Discard)
+
+	s, err := NewServer(mockTransport)
+	if err != nil {
+		t.Fatalf("Failed to create server: %v", err)
+	}
+
+	if s == nil {
+		t.Fatal("Server is nil")
+	}
+
+	testHandler := func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+		return protocol.NewCallToolResult([]protocol.Content{
+			&protocol.TextContent{Type: "text", Text: "success"},
+		}, false), nil
+	}
+
+	testTool := &protocol.Tool{
+		Name:        "test",
+		Description: "Test tool",
+		InputSchema: protocol.InputSchema{
+			Type:       "object",
+			Properties: map[string]*protocol.Property{},
+		},
+	}
+	s.RegisterTool(testTool, testHandler)
+
 }

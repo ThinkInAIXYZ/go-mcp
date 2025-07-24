@@ -118,6 +118,13 @@ func main() {
 		log.Fatalf("创建 MCP 服务器失败: %v", err)
 	}
 
+	// 可选：全局中间件（支持多个中间件参数）
+	// mcpServer.Use(
+	// 	LoggingMiddleware,
+	// 	AuthMiddleware,
+	// 	MetricsMiddleware,
+	// )
+
 	// 注册时间查询工具
 	tool, err := protocol.NewTool("current_time", "获取指定时区的当前时间", TimeRequest{})
 	if err != nil {
