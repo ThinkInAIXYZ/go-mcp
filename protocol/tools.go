@@ -49,6 +49,9 @@ type Tool struct {
 	// InputSchema defines the expected parameters for the tool using JSON Schema
 	InputSchema InputSchema `json:"inputSchema"`
 
+	// OutputSchema defines the expected output format of the tool using JSON Schema
+	OutputSchema OutputSchema `json:"outputSchema,omitempty"`
+
 	// Annotations provides additional hints about the tool's behavior
 	Annotations *ToolAnnotations `json:"annotations,omitempty"`
 
@@ -64,7 +67,7 @@ func (t *Tool) GetName() string {
 }
 
 func (t *Tool) MarshalJSON() ([]byte, error) {
-	m := make(map[string]interface{}, 4)
+	m := make(map[string]interface{}, 5)
 
 	m["name"] = t.Name
 	if t.Description != "" {
@@ -78,8 +81,12 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 		}
 		m["inputSchema"] = t.RawInputSchema
 	} else {
-		// Use the structured InputSchema
 		m["inputSchema"] = t.InputSchema
+	}
+
+	// Add output schema if present
+	if t.OutputSchema.Type != "" {
+		m["outputSchema"] = t.OutputSchema
 	}
 
 	// Add annotations if present
@@ -90,13 +97,26 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-type InputSchemaType string
+type (
+	InputSchemaType  string
+	OutputSchemaType string
+)
 
-const Object InputSchemaType = "object"
+const (
+	Object       InputSchemaType  = "object"
+	OutputObject OutputSchemaType = "object"
+)
 
-// InputSchema represents a JSON Schema object defining the expected parameters for a tool
+// InputSchema represents a JSON Schema object defining the expected structure for input
 type InputSchema struct {
 	Type       InputSchemaType      `json:"type"`
+	Properties map[string]*Property `json:"properties,omitempty"`
+	Required   []string             `json:"required,omitempty"`
+}
+
+// OutputSchema represents a JSON Schema object defining the expected structure for output
+type OutputSchema struct {
+	Type       OutputSchemaType     `json:"type"`
 	Properties map[string]*Property `json:"properties,omitempty"`
 	Required   []string             `json:"required,omitempty"`
 }
@@ -157,8 +177,9 @@ func (r *CallToolRequest) MarshalJSON() ([]byte, error) {
 
 // CallToolResult represents the response to a tool call
 type CallToolResult struct {
-	Content []Content `json:"content"`
-	IsError bool      `json:"isError,omitempty"`
+	Content           []Content   `json:"content"`
+	IsError           bool        `json:"isError,omitempty"`
+	StructuredContent interface{} `json:"structuredContent,omitempty"`
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface for CallToolResult
@@ -223,16 +244,26 @@ type ToolListChangedNotification struct {
 }
 
 // NewTool create a tool
-func NewTool(name string, description string, inputReqStruct interface{}) (*Tool, error) {
-	schema, err := generateSchemaFromReqStruct(inputReqStruct)
+func NewTool(name string, description string, inputReqStruct interface{}, outputStructs ...interface{}) (*Tool, error) {
+	inputSchema, err := generateSchemaFromReqStruct(inputReqStruct)
 	if err != nil {
 		return nil, err
 	}
 
+	outputSchema := &OutputSchema{}
+	if len(outputStructs) > 0 && outputStructs[0] != nil {
+		var err error
+		outputSchema, err = generateOutputSchemaFromReqStruct(outputStructs[0])
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Tool{
-		Name:        name,
-		Description: description,
-		InputSchema: *schema,
+		Name:         name,
+		Description:  description,
+		InputSchema:  *inputSchema,
+		OutputSchema: *outputSchema,
 	}, nil
 }
 
