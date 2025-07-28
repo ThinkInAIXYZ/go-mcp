@@ -33,8 +33,10 @@ type Property struct {
 	Enum       []string             `json:"enum,omitempty"`
 }
 
-var schemaCache = pkg.SyncMap[*InputSchema]{}
-var outputSchemaCache = pkg.SyncMap[*OutputSchema]{}
+var (
+	schemaCache       = pkg.SyncMap[*InputSchema]{}
+	outputSchemaCache = pkg.SyncMap[*OutputSchema]{}
+)
 
 func generateSchemaFromReqStruct(v any) (*InputSchema, error) {
 	t := reflect.TypeOf(v)

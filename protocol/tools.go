@@ -97,11 +97,15 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-type InputSchemaType string
-type OutputSchemaType string
+type (
+	InputSchemaType  string
+	OutputSchemaType string
+)
 
-const Object InputSchemaType = "object"
-const OutputObject OutputSchemaType = "object"
+const (
+	Object       InputSchemaType  = "object"
+	OutputObject OutputSchemaType = "object"
+)
 
 // InputSchema represents a JSON Schema object defining the expected structure for input
 type InputSchema struct {

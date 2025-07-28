@@ -269,11 +269,8 @@ func (server *Server) buildMiddlewareChain(finalHandler ToolHandlerFunc) ToolHan
 
 	handler := finalHandler
 	for i := len(server.globalMiddlewares) - 1; i >= 0; i-- {
-		middleware := server.globalMiddlewares[i]
-		currentHandler := handler
-		handler = middleware(currentHandler)
+		handler = server.globalMiddlewares[i](handler)
 	}
-
 	return handler
 }
 

@@ -193,8 +193,13 @@ func (client *Client) ListTools(ctx context.Context) (*protocol.ListToolsResult,
 	}
 
 	var result protocol.ListToolsResult
-	if err := pkg.JSONUnmarshal(response, &result); err != nil {
+	if err = pkg.JSONUnmarshal(response, &result); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+	for _, t := range result.Tools {
+		if t.InputSchema.Properties == nil {
+			t.InputSchema.Properties = make(map[string]*protocol.Property)
+		}
 	}
 	return &result, nil
 }

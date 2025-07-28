@@ -87,7 +87,7 @@ func PanicRecoveryMiddleware() server.ToolMiddleware {
 }
 
 // HelloWorldHandler is a sample tool handler
-func HelloWorldHandler(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func HelloWorldHandler(_ context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	name := "World"
 	if req.Arguments != nil {
 		if n, ok := req.Arguments["name"]; ok {
@@ -105,7 +105,7 @@ func HelloWorldHandler(ctx context.Context, req *protocol.CallToolRequest) (*pro
 }
 
 // CounterHandler is another sample tool handler
-func CounterHandler(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+func CounterHandler(_ context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 	count := 1
 	if req.Arguments != nil {
 		if c, ok := req.Arguments["count"]; ok {
@@ -147,11 +147,11 @@ func main() {
 		InputSchema: protocol.InputSchema{
 			Type: "object",
 			Properties: map[string]*protocol.Property{
-				"name": &protocol.Property{
+				"name": {
 					Type:        protocol.String,
 					Description: "Name to greet",
 				},
-				"auth_token": &protocol.Property{
+				"auth_token": {
 					Type:        protocol.String,
 					Description: "Authentication token (required)",
 				},
@@ -167,11 +167,11 @@ func main() {
 		InputSchema: protocol.InputSchema{
 			Type: "object",
 			Properties: map[string]*protocol.Property{
-				"count": &protocol.Property{
+				"count": {
 					Type:        protocol.Number,
 					Description: "Number to count",
 				},
-				"auth_token": &protocol.Property{
+				"auth_token": {
 					Type:        protocol.String,
 					Description: "Authentication token (required)",
 				},
@@ -183,7 +183,7 @@ func main() {
 
 	log.Println("Server starting...")
 	log.Println("Try these commands:")
-	log.Println(`echo '{"method":"tools/call","params":{"name":"hello","arguments":{"name":"World","auth_token":"valid_token"}}}' | go run examples/middleware_example/main.go`)
+	log.Println(`echo '{"method":"tools/call","params":{"name":"hello","arguments":{"name":"World","auth_token":"valid_token"}}}' | go run examples/middleware_example/main.go`) //nolint:lll
 
 	if err := mcpServer.Run(); err != nil {
 		log.Fatal("Server failed:", err)
