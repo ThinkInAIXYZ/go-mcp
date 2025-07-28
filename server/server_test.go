@@ -965,8 +965,8 @@ func TestMiddlewareEarlyReturn(t *testing.T) {
 		t.Fatal("Server is nil")
 	}
 
-	authMiddleware := func(next ToolHandlerFunc) ToolHandlerFunc {
-		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	authMiddleware := func(_ ToolHandlerFunc) ToolHandlerFunc {
+		return func(_ context.Context, _ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 			return nil, context.Canceled
 		}
 	}
@@ -987,7 +987,7 @@ func TestNoMiddleware(t *testing.T) {
 		t.Fatal("Server is nil")
 	}
 
-	testHandler := func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+	testHandler := func(_ context.Context, _ *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
 		return protocol.NewCallToolResult([]protocol.Content{
 			&protocol.TextContent{Type: "text", Text: "success"},
 		}, false), nil
