@@ -34,6 +34,7 @@ type Property struct {
 }
 
 var schemaCache = pkg.SyncMap[*InputSchema]{}
+var outputSchemaCache = pkg.SyncMap[*OutputSchema]{}
 
 func generateSchemaFromReqStruct(v any) (*InputSchema, error) {
 	t := reflect.TypeOf(v)
@@ -60,6 +61,34 @@ func generateSchemaFromReqStruct(v any) (*InputSchema, error) {
 	schema.Required = property.Required
 
 	schemaCache.Store(typeUID, schema)
+	return schema, nil
+}
+
+func generateOutputSchemaFromReqStruct(v any) (*OutputSchema, error) {
+	t := reflect.TypeOf(v)
+	for t.Kind() != reflect.Struct {
+		if t.Kind() != reflect.Ptr {
+			return nil, fmt.Errorf("invalid type %v", t)
+		}
+		t = t.Elem()
+	}
+
+	typeUID := getTypeUUID(t)
+	if schema, ok := outputSchemaCache.Load(typeUID); ok {
+		return schema, nil
+	}
+
+	schema := &OutputSchema{Type: OutputObject}
+
+	property, err := reflectSchemaByObject(t)
+	if err != nil {
+		return nil, err
+	}
+
+	schema.Properties = property.Properties
+	schema.Required = property.Required
+
+	outputSchemaCache.Store(typeUID, schema)
 	return schema, nil
 }
 

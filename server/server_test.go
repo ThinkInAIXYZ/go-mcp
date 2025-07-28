@@ -1002,5 +1002,100 @@ func TestNoMiddleware(t *testing.T) {
 		},
 	}
 	s.RegisterTool(testTool, testHandler)
+}
 
+// TestNewToolBackwardCompatibility tests that NewTool works with backward compatibility (input schema only)
+func TestNewToolBackwardCompatibility(t *testing.T) {
+	tool, err := protocol.NewTool("test_tool", "Test tool description", currentTimeReq{})
+	if err != nil {
+		t.Fatalf("NewTool failed: %v", err)
+	}
+	if tool.Name != "test_tool" {
+		t.Errorf("Expected tool name 'test_tool', got '%s'", tool.Name)
+	}
+
+	if tool.Description != "Test tool description" {
+		t.Errorf("Expected description 'Test tool description', got '%s'", tool.Description)
+	}
+
+	if tool.OutputSchema.Type != "" {
+		t.Errorf("Expected no output schema, got %v", tool.OutputSchema)
+	}
+}
+
+// TestNewToolWithOutputSchema tests that NewTool works correctly with both input and output schemas
+func TestNewToolWithOutputSchema(t *testing.T) {
+	type TestInput struct {
+		Name string `json:"name" description:"The name" required:"true"`
+	}
+
+	type TestOutput struct {
+		Result string `json:"result" description:"The result"`
+		Count  int    `json:"count" description:"The count"`
+	}
+
+	tool, err := protocol.NewTool("test_with_output", "Test tool with output schema", TestInput{}, TestOutput{})
+	if err != nil {
+		t.Fatalf("NewTool with output schema failed: %v", err)
+	}
+
+	if tool.OutputSchema.Type == "" {
+		t.Fatalf("Expected output schema, got empty")
+	}
+
+	if tool.OutputSchema.Type != "object" {
+		t.Errorf("Expected schema type 'object', got %v", tool.OutputSchema.Type)
+	}
+
+	if len(tool.OutputSchema.Properties) != 2 {
+		t.Errorf("Expected 2 properties, got %d", len(tool.OutputSchema.Properties))
+	}
+}
+
+// TestNewToolErrorHandling tests error handling for invalid input and output schemas
+func TestNewToolErrorHandling(t *testing.T) {
+	_, err := protocol.NewTool("invalid", "test", func() {})
+	if err == nil {
+		t.Fatal("Expected error for invalid input schema, got nil")
+	}
+
+	_, err = protocol.NewTool("invalid", "test", currentTimeReq{}, func() {})
+	if err == nil {
+		t.Fatal("Expected error for invalid output schema, got nil")
+	}
+}
+
+// TestCallToolResultStructuredContent tests that CallToolResult properly handles structured content alongside regular content
+func TestCallToolResultStructuredContent(t *testing.T) {
+	structuredData := map[string]interface{}{
+		"temperature": 25.5,
+		"condition":   "sunny",
+	}
+
+	result := &protocol.CallToolResult{
+		Content: []protocol.Content{
+			&protocol.TextContent{
+				Type: "text",
+				Text: "Weather: 25.5°C, sunny",
+			},
+		},
+		StructuredContent: structuredData,
+	}
+
+	jsonData, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("Failed to marshal CallToolResult: %v", err)
+	}
+
+	var unmarshaledResult protocol.CallToolResult
+	if err := json.Unmarshal(jsonData, &unmarshaledResult); err != nil {
+		t.Fatalf("Failed to unmarshal CallToolResult: %v", err)
+	}
+	if unmarshaledResult.StructuredContent == nil {
+		t.Fatal("Expected structured content to be preserved")
+	}
+
+	if len(unmarshaledResult.Content) != 1 {
+		t.Errorf("Expected 1 content item, got %d", len(unmarshaledResult.Content))
+	}
 }
