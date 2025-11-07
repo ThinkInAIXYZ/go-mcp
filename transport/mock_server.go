@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -61,6 +62,11 @@ func (t *mockServerTransport) SetReceiver(receiver serverReceiver) {
 
 func (t *mockServerTransport) SetSessionManager(m sessionManager) {
 	t.sessionManager = m
+}
+
+// ApplyAuthMiddleware is a no-op for mock server (non-HTTP)
+func (t *mockServerTransport) ApplyAuthMiddleware(middleware func(http.Handler) http.Handler) {
+	// no-op
 }
 
 func (t *mockServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {

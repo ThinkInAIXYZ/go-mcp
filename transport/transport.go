@@ -2,6 +2,7 @@ package transport
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -69,6 +70,14 @@ type ServerTransport interface {
 	SetReceiver(serverReceiver)
 
 	SetSessionManager(manager sessionManager)
+
+	// ApplyAuthMiddleware applies an HTTP authentication middleware to the transport layer.
+	// This method allows the server to inject authentication logic at the HTTP level,
+	// ensuring that all incoming requests are authenticated before reaching the business logic.
+	// The middleware parameter is a function that wraps an http.Handler with authentication logic.
+	// Not all transports may support this (e.g., stdio transport), so implementations
+	// should handle this gracefully (e.g., no-op for non-HTTP transports).
+	ApplyAuthMiddleware(middleware func(http.Handler) http.Handler)
 
 	// Shutdown gracefully closes, the internal implementation needs to stop receiving messages first,
 	// then wait for serverCtx to be canceled, while using userCtx to control timeout.

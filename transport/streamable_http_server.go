@@ -77,6 +77,8 @@ type streamableHTTPServerTransport struct {
 
 	sessionManager sessionManager
 
+	authMiddleware func(http.Handler) http.Handler
+
 	// options
 	logger      pkg.Logger
 	mcpEndpoint string // The single MCP endpoint path
@@ -146,6 +148,10 @@ func NewStreamableHTTPServerTransport(addr string, opts ...StreamableHTTPServerT
 	return t
 }
 
+func (t *streamableHTTPServerTransport) ApplyAuthMiddleware(middleware func(http.Handler) http.Handler) {
+	t.authMiddleware = middleware
+}
+
 func (t *streamableHTTPServerTransport) Run() error {
 	if t.httpSvr == nil {
 		<-t.ctx.Done()
@@ -181,6 +187,16 @@ func (t *streamableHTTPServerTransport) SetSessionManager(manager sessionManager
 }
 
 func (t *streamableHTTPServerTransport) handleMCPEndpoint(w http.ResponseWriter, r *http.Request) {
+	if t.authMiddleware != nil {
+		t.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.handleMCPEndpointCore(w, r)
+		})).ServeHTTP(w, r)
+		return
+	}
+	t.handleMCPEndpointCore(w, r)
+}
+
+func (t *streamableHTTPServerTransport) handleMCPEndpointCore(w http.ResponseWriter, r *http.Request) {
 	defer pkg.RecoverWithFunc(func(_ any) {
 		t.writeError(w, http.StatusInternalServerError, "Internal server error")
 	})

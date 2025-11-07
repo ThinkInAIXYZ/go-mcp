@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
@@ -74,6 +75,11 @@ func (t *stdioServerTransport) SetReceiver(receiver serverReceiver) {
 
 func (t *stdioServerTransport) SetSessionManager(m sessionManager) {
 	t.sessionManager = m
+}
+
+// ApplyAuthMiddleware is a no-op for stdio transport (non-HTTP)
+func (t *stdioServerTransport) ApplyAuthMiddleware(middleware func(http.Handler) http.Handler) {
+	// no-op
 }
 
 func (t *stdioServerTransport) Shutdown(userCtx context.Context, serverCtx context.Context) error {

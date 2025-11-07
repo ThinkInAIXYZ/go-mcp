@@ -65,6 +65,8 @@ type sseServerTransport struct {
 
 	httpSvr *http.Server
 
+	mux *http.ServeMux
+
 	messageEndpointURL string // Auto-generated
 
 	inFlySend sync.WaitGroup
@@ -72,6 +74,8 @@ type sseServerTransport struct {
 	receiver serverReceiver
 
 	sessionManager sessionManager
+
+	authMiddleware func(http.Handler) http.Handler
 
 	// options
 	logger        pkg.Logger
@@ -98,6 +102,10 @@ func (h *SSEHandler) HandleMessage() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.transport.handleMessage(w, r)
 	})
+}
+
+func (t *sseServerTransport) ApplyAuthMiddleware(middleware func(http.Handler) http.Handler) {
+	t.authMiddleware = middleware
 }
 
 // NewSSEServerTransport returns transport that will start an HTTP server
@@ -129,6 +137,7 @@ func NewSSEServerTransport(addr string, opts ...SSEServerTransportOption) (Serve
 	mux := http.NewServeMux()
 	mux.HandleFunc(t.ssePath, t.handleSSE)
 	mux.HandleFunc(t.messagePath, t.handleMessage)
+	t.mux = mux
 
 	t.httpSvr = &http.Server{
 		Addr:        addr,
@@ -205,8 +214,33 @@ func (t *sseServerTransport) SetSessionManager(manager sessionManager) {
 	t.sessionManager = manager
 }
 
-// handleSSE handles incoming SSE connections from clients and sends messages to them.
+// RegisterHandler allows registering custom routes on the HTTP server of the SSE Server
+// Only valid when creating a transport using NewSSEServerTransport
+func (t *sseServerTransport) RegisterHandler(pattern string, handler http.Handler) error {
+	if t.mux == nil {
+		return fmt.Errorf("mux is not available, use NewSSEServerTransport to create transport")
+	}
+	t.mux.Handle(pattern, handler)
+	return nil
+}
+
+// RegisterHandlerFunc is a convenience method of RegisterHandler that accepts HandlerFunc
+func (t *sseServerTransport) RegisterHandlerFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) error {
+	return t.RegisterHandler(pattern, http.HandlerFunc(handler))
+}
+
 func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
+	if t.authMiddleware != nil {
+		t.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.handleSSECore(w, r)
+		})).ServeHTTP(w, r)
+		return
+	}
+	t.handleSSECore(w, r)
+}
+
+// handleSSECore handles incoming SSE connections from clients and sends messages to them.
+func (t *sseServerTransport) handleSSECore(w http.ResponseWriter, r *http.Request) {
 	defer pkg.RecoverWithFunc(func(_ any) {
 		t.writeError(w, http.StatusInternalServerError, "Internal server error")
 	})
@@ -269,6 +303,17 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 // handleMessage processes incoming JSON-RPC messages from clients and sends responses
 // back through both the SSE connection and HTTP response.
 func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Request) {
+	if t.authMiddleware != nil {
+		t.authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.handleMessageCore(w, r)
+		})).ServeHTTP(w, r)
+		return
+	}
+
+	t.handleMessageCore(w, r)
+}
+
+func (t *sseServerTransport) handleMessageCore(w http.ResponseWriter, r *http.Request) {
 	defer pkg.RecoverWithFunc(func(_ any) {
 		t.writeError(w, http.StatusInternalServerError, "Internal server error")
 	})

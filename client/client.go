@@ -45,6 +45,19 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+func WithAuthAndRefresher(
+	accessToken, refreshToken string,
+	expiry time.Time,
+	refresher func(string) (string, string, time.Time, error),
+) Option {
+	return func(c *Client) {
+		c.accessToken = accessToken
+		c.refreshToken = refreshToken
+		c.tokenExpiry = expiry
+		c.tokenRefresher = refresher
+	}
+}
+
 type Client struct {
 	transport transport.ClientTransport
 
@@ -74,6 +87,12 @@ type Client struct {
 	closed chan struct{}
 
 	logger pkg.Logger
+
+	accessToken    string
+	refreshToken   string
+	tokenExpiry    time.Time
+	tokenMutex     sync.RWMutex
+	tokenRefresher func(refreshToken string) (accessToken, newRefreshToken string, expiry time.Time, err error)
 }
 
 func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
@@ -92,6 +111,13 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 
 	for _, opt := range opts {
 		opt(client)
+	}
+
+	if tp, ok := t.(interface{ SetTokenProvider(func() string) }); ok {
+		tp.SetTokenProvider(func() string {
+			token, _ := client.GetAccessToken()
+			return token
+		})
 	}
 
 	if client.notifyHandler == nil {
@@ -159,4 +185,39 @@ func (client *Client) sessionDetection() {
 	if _, err := client.Ping(ctx, protocol.NewPingRequest()); err != nil {
 		client.logger.Warnf("mcp client ping server fail: %v", err)
 	}
+}
+
+func (c *Client) GetAccessToken() (string, bool) {
+	c.tokenMutex.RLock()
+
+	if time.Now().Before(c.tokenExpiry) {
+		token := c.accessToken
+		c.tokenMutex.RUnlock()
+		return token, true
+	}
+
+	c.tokenMutex.RUnlock()
+
+	if c.tokenRefresher == nil {
+		return "", false
+	}
+
+	c.tokenMutex.Lock()
+	defer c.tokenMutex.Unlock()
+
+	if time.Now().Before(c.tokenExpiry) {
+		return c.accessToken, true
+	}
+
+	newAccessToken, newRefreshToken, newExpiry, err := c.tokenRefresher(c.refreshToken)
+	if err != nil {
+		c.logger.Errorf("Failed to refresh token: %v", err)
+		return "", false
+	}
+
+	c.accessToken = newAccessToken
+	c.refreshToken = newRefreshToken
+	c.tokenExpiry = newExpiry
+
+	return newAccessToken, true
 }

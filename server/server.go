@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/ThinkInAIXYZ/go-mcp/auth"
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
@@ -46,8 +48,8 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
-// ToolMiddleware defines the middleware type of the tool handler
-// Allow ToolHandlerFunc to be wrapped like a chain call
+// ToolHandlerFunc and ToolMiddleware are defined and stay in the server package.
+type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
 
 // RateLimitMiddleware Return a rate-limiting middleware
@@ -71,6 +73,32 @@ func WithPagination(limit int) Option {
 func WithGenSessionIDFunc(genSessionID func(context.Context) string) Option {
 	return func(s *Server) {
 		s.genSessionID = genSessionID
+	}
+}
+
+func WithAuth(authServer *auth.Server, toolScopes map[string][]string) Option {
+	return func(s *Server) {
+		if authServer == nil {
+			return
+		}
+
+		middleware := auth.NewMiddleware(authServer)
+		s.authMiddleware = middleware
+
+		s.authHandler = auth.NewHandler(authServer)
+		s.authServer = authServer
+
+		if len(toolScopes) > 0 {
+			// Call the generic function with the specific type from this package.
+			mw := auth.ScopeBasedToolMiddleware[ToolHandlerFunc](middleware, toolScopes)
+			s.Use(mw)
+		} else {
+			// Call the generic function with the specific type from this package.
+			mw := auth.MCPToolMiddleware[ToolHandlerFunc](middleware, &auth.MiddlewareConfig{
+				RequiredScopes: []string{"read"},
+			})
+			s.Use(mw)
+		}
 	}
 }
 
@@ -102,6 +130,10 @@ type Server struct {
 	globalMiddlewares []ToolMiddleware
 
 	toolFilters ToolFilter
+
+	authMiddleware *auth.Middleware
+	authServer     *auth.Server
+	authHandler    *auth.Handler
 }
 
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
@@ -124,6 +156,10 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 
 	for _, opt := range opts {
 		opt(server)
+	}
+
+	if server.authMiddleware != nil {
+		t.ApplyAuthMiddleware(server.authMiddleware.HTTPMiddleware)
 	}
 
 	server.sessionManager.SetLogger(server.logger)
@@ -154,8 +190,6 @@ type toolEntry struct {
 	tool    *protocol.Tool
 	handler ToolHandlerFunc
 }
-
-type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
 func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc, middlewares ...ToolMiddleware) {
 	for i := len(middlewares) - 1; i >= 0; i-- {
@@ -311,5 +345,53 @@ func (server *Server) sessionDetection(ctx context.Context, sessionID string) er
 	if _, err := server.Ping(setSessionIDToCtx(ctx, sessionID), protocol.NewPingRequest()); err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *Server) WrapWithAuth(handler http.Handler) http.Handler {
+	if s.authMiddleware == nil {
+		return handler
+	}
+	return s.authMiddleware.HTTPMiddleware(handler)
+}
+
+func (server *Server) GetOAuthHandler() *auth.Handler {
+	return server.authHandler
+}
+
+// RegisterOAuthRoutes automatically registers OAuth routes with transport
+// Only effective if transport implements the HTTPRouteRegistrar interface
+func (server *Server) RegisterOAuthRoutes() error {
+	if server.authHandler == nil {
+		return fmt.Errorf("OAuth not configured, use WithAuth option")
+	}
+
+	// 尝试获取 HTTPRouteRegistrar 接口
+	registrar, ok := server.transport.(interface {
+		RegisterHandler(pattern string, handler http.Handler) error
+	})
+
+	if !ok {
+		return fmt.Errorf("transport does not support HTTP route registration")
+	}
+
+	// 注册 OAuth 路由
+	routes := map[string]http.Handler{
+		"/oauth/authorize":  http.HandlerFunc(server.authHandler.HandleAuthorization),
+		"/oauth/token":      http.HandlerFunc(server.authHandler.HandleToken),
+		"/oauth/introspect": http.HandlerFunc(server.authHandler.HandleIntrospection),
+		"/oauth/revoke":     http.HandlerFunc(server.authHandler.HandleRevocation),
+		"/register":         http.HandlerFunc(server.authHandler.GetDynamicRegistrationHandler().HandleRegister),
+		"/.well-known/oauth-authorization-server": server.authServer.GetMetadataProvider(),
+		"/.well-known/oauth-protected-resource":   http.HandlerFunc(server.authServer.GetMetadataProvider().ServeProtectedResourceMetadata),
+		"/.well-known/jwks.json":                  server.authServer.GetJWKSProvider(),
+	}
+
+	for pattern, handler := range routes {
+		if err := registrar.RegisterHandler(pattern, handler); err != nil {
+			return fmt.Errorf("failed to register %s: %w", pattern, err)
+		}
+	}
+
 	return nil
 }
