@@ -221,7 +221,14 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		ctx = context.WithValue(ctx, SessionIDForReturnKey{}, &SessionIDForReturn{})
 	}
 
-	outputMsgCh, err := t.receiver.Receive(ctx, r.Header.Get(sessionIDHeader), bs)
+	// In stateless mode, ignore any session ID sent by the client (e.g. from MCP proxies)
+	// to avoid rejecting requests with stale or unrecognized session headers.
+	sessionID := ""
+	if t.stateMode == Stateful {
+		sessionID = r.Header.Get(sessionIDHeader)
+	}
+
+	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, bs)
 	if err != nil {
 		if errors.Is(err, pkg.ErrSessionClosed) {
 			t.writeError(w, http.StatusNotFound, fmt.Sprintf("Failed to receive: %v", err))
