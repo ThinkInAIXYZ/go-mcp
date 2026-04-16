@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"slices"
 	"sort"
 	"testing"
 )
@@ -59,26 +60,26 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "string",
 					},
 					"number": {
-						Type: Number,
+						Type: PropertyType{Number},
 					},
 					"string4enum": {
-						Type: String,
+						Type: PropertyType{String},
 						Enum: []string{"a", "b", "c"},
 					},
 					"integer4enum": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []string{"1", "2", "3"},
 					},
 					"number4enum": {
-						Type: Number,
+						Type: PropertyType{Number},
 						Enum: []string{"1.1", "2.2", "3.3"},
 					},
 					"number4enum2": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []string{"1", "2", "3"},
 					},
 				},
@@ -94,26 +95,26 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "string",
 					},
 					"number": {
-						Type: Number,
+						Type: PropertyType{Number},
 					},
 					"string4enum": {
-						Type: String,
+						Type: PropertyType{String},
 						Enum: []string{"a", "b", "c"},
 					},
 					"integer4enum": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []string{"1", "2", "3"},
 					},
 					"number4enum": {
-						Type: Number,
+						Type: PropertyType{Number},
 						Enum: []string{"1.1", "2.2", "3.3"},
 					},
 					"number4enum2": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []string{"1", "2", "3"},
 					},
 				},
@@ -168,20 +169,20 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"name": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "user name",
 					},
 					"age": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 					},
 					"address": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"city": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"street": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 						},
 						Required: []string{"city"},
@@ -203,13 +204,13 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"id": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 					},
 					"email": {
-						Type: String,
+						Type: PropertyType{String},
 					},
 					"active": {
-						Type: Boolean,
+						Type: PropertyType{Boolean},
 					},
 				},
 				Required: []string{"id", "active"},
@@ -232,19 +233,19 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"user": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"name": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"info": {
-								Type: ObjectT,
+								Type: PropertyType{ObjectT},
 								Properties: map[string]*Property{
 									"age": {
-										Type: Integer,
+										Type: PropertyType{Integer},
 									},
 									"active": {
-										Type: Boolean,
+										Type: PropertyType{Boolean},
 									},
 								},
 								Required: []string{"active"},
@@ -270,13 +271,13 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"user": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"name": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"info": {
-								Type: ObjectT,
+								Type: PropertyType{ObjectT},
 							},
 						},
 						Required: []string{"name", "info"},
@@ -353,7 +354,7 @@ func compareProperty(a, b *Property) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	if a.Type != b.Type {
+	if !slices.Equal(a.Type, b.Type) {
 		return false
 	}
 	if a.Description != b.Description {

@@ -132,7 +132,7 @@ func TestClientCall(t *testing.T) {
 					Type: protocol.Object,
 					Properties: map[string]*protocol.Property{
 						"timezone": {
-							Type:        "string",
+							Type:        protocol.PropertyType{protocol.String},
 							Description: "current time timezone",
 						},
 					},

@@ -30,7 +30,7 @@ func VerifyAndUnmarshal(content json.RawMessage, v any) error {
 	}
 
 	return verifySchemaAndUnmarshal(Property{
-		Type:       ObjectT,
+		Type:       PropertyType{ObjectT},
 		Properties: schema.Properties,
 		Required:   schema.Required,
 	}, content, v)
@@ -49,7 +49,23 @@ func verifySchemaAndUnmarshal(schema Property, content []byte, v any) error {
 }
 
 func validate(schema Property, data any) bool {
-	switch schema.Type {
+	types := schema.Type
+	if len(types) == 0 {
+		return false
+	}
+	if len(types) == 1 {
+		return validateWithType(types[0], schema, data)
+	}
+	for _, typ := range types {
+		if validateWithType(typ, schema, data) {
+			return true
+		}
+	}
+	return false
+}
+
+func validateWithType(typ DataType, schema Property, data any) bool {
+	switch typ {
 	case ObjectT:
 		return validateObject(schema, data)
 	case Array:
