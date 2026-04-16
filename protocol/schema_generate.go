@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -21,8 +22,54 @@ const (
 	Boolean DataType = "boolean"
 )
 
+// PropertyType is a JSON Schema "type" keyword: either a single type string or a union (array of strings).
+type PropertyType []DataType
+
+func (pt PropertyType) MarshalJSON() ([]byte, error) {
+	if len(pt) == 0 {
+		return json.Marshal("")
+	}
+	if len(pt) == 1 {
+		return json.Marshal(string(pt[0]))
+	}
+	ss := make([]string, len(pt))
+	for i, t := range pt {
+		ss[i] = string(t)
+	}
+	return json.Marshal(ss)
+}
+
+func (pt *PropertyType) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 {
+		*pt = nil
+		return nil
+	}
+	if string(data) == "null" {
+		*pt = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if s == "" {
+			*pt = nil
+			return nil
+		}
+		*pt = PropertyType{DataType(s)}
+		return nil
+	}
+	var arr []string
+	if err := json.Unmarshal(data, &arr); err != nil {
+		return err
+	}
+	*pt = make(PropertyType, len(arr))
+	for i, x := range arr {
+		(*pt)[i] = DataType(x)
+	}
+	return nil
+}
+
 type Property struct {
-	Type DataType `json:"type"`
+	Type PropertyType `json:"type"`
 	// Description is the description of the schema.
 	Description string `json:"description,omitempty"`
 	// Items specifies which data type an array contains, if the schema type is Array.
@@ -220,7 +267,7 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 	}
 
 	property := &Property{
-		Type:       ObjectT,
+		Type:       PropertyType{ObjectT},
 		Properties: properties,
 		Required:   requiredFields,
 	}
@@ -232,16 +279,16 @@ func reflectSchemaByType(t reflect.Type) (*Property, error) {
 
 	switch t.Kind() {
 	case reflect.String:
-		s.Type = String
+		s.Type = PropertyType{String}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		s.Type = Integer
+		s.Type = PropertyType{Integer}
 	case reflect.Float32, reflect.Float64:
-		s.Type = Number
+		s.Type = PropertyType{Number}
 	case reflect.Bool:
-		s.Type = Boolean
+		s.Type = PropertyType{Boolean}
 	case reflect.Slice, reflect.Array:
-		s.Type = Array
+		s.Type = PropertyType{Array}
 		items, err := reflectSchemaByType(t.Elem())
 		if err != nil {
 			return nil, err
@@ -252,14 +299,14 @@ func reflectSchemaByType(t reflect.Type) (*Property, error) {
 		if err != nil {
 			return nil, err
 		}
-		object.Type = ObjectT
+		object.Type = PropertyType{ObjectT}
 		s = object
 	case reflect.Map:
 		if t.Key().Kind() != reflect.String {
 			return nil, fmt.Errorf("map key type %s is not supported", t.Key().Kind())
 		}
 		object := &Property{
-			Type: ObjectT,
+			Type: PropertyType{ObjectT},
 		}
 		s = object
 	case reflect.Ptr:

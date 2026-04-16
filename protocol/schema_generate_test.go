@@ -65,26 +65,26 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "string",
 					},
 					"number": {
-						Type: Number,
+						Type: PropertyType{Number},
 					},
 					"string4enum": {
-						Type: String,
+						Type: PropertyType{String},
 						Enum: []any{"a", "b", "c"},
 					},
 					"integer4enum": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 					"number4enum": {
-						Type: Number,
+						Type: PropertyType{Number},
 						Enum: []any{1.1, 2.2, 3.3},
 					},
 					"number4enum2": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 				},
@@ -100,26 +100,26 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "string",
 					},
 					"number": {
-						Type: Number,
+						Type: PropertyType{Number},
 					},
 					"string4enum": {
-						Type: String,
+						Type: PropertyType{String},
 						Enum: []any{"a", "b", "c"},
 					},
 					"integer4enum": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 					"number4enum": {
-						Type: Number,
+						Type: PropertyType{Number},
 						Enum: []any{1.1, 2.2, 3.3},
 					},
 					"number4enum2": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 				},
@@ -135,31 +135,31 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "string",
 					},
 					"extraField": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "extra string enum",
 						Enum:        []any{"a", "b", "c"},
 					},
 					"number": {
-						Type: Number,
+						Type: PropertyType{Number},
 					},
 					"string4enum": {
-						Type: String,
+						Type: PropertyType{String},
 						Enum: []any{"a", "b", "c"},
 					},
 					"integer4enum": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 					"number4enum": {
-						Type: Number,
+						Type: PropertyType{Number},
 						Enum: []any{1.1, 2.2, 3.3},
 					},
 					"number4enum2": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 						Enum: []any{1, 2, 3},
 					},
 				},
@@ -225,20 +225,20 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"name": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "user name",
 					},
 					"age": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 					},
 					"address": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"city": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"street": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 						},
 						Required: []string{"city"},
@@ -260,13 +260,13 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"id": {
-						Type: Integer,
+						Type: PropertyType{Integer},
 					},
 					"email": {
-						Type: String,
+						Type: PropertyType{String},
 					},
 					"active": {
-						Type: Boolean,
+						Type: PropertyType{Boolean},
 					},
 				},
 				Required: []string{"id", "active"},
@@ -289,19 +289,19 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"user": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"name": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"info": {
-								Type: ObjectT,
+								Type: PropertyType{ObjectT},
 								Properties: map[string]*Property{
 									"age": {
-										Type: Integer,
+										Type: PropertyType{Integer},
 									},
 									"active": {
-										Type: Boolean,
+										Type: PropertyType{Boolean},
 									},
 								},
 								Required: []string{"active"},
@@ -327,13 +327,13 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"user": {
-						Type: ObjectT,
+						Type: PropertyType{ObjectT},
 						Properties: map[string]*Property{
 							"name": {
-								Type: String,
+								Type: PropertyType{String},
 							},
 							"info": {
-								Type: ObjectT,
+								Type: PropertyType{ObjectT},
 							},
 						},
 						Required: []string{"name", "info"},
@@ -402,6 +402,18 @@ func compareInputSchema(a, b *InputSchema) bool {
 	return true
 }
 
+func equalPropertyType(a, b PropertyType) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // compareProperty Compare the contents of two Property structures
 func compareProperty(a, b *Property) bool {
 	if a == nil && b == nil {
@@ -410,7 +422,7 @@ func compareProperty(a, b *Property) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	if a.Type != b.Type {
+	if !equalPropertyType(a.Type, b.Type) {
 		return false
 	}
 	if a.Description != b.Description {
@@ -528,29 +540,29 @@ func TestGenerateSchemaWithDefaultValues(t *testing.T) {
 				Type: Object,
 				Properties: map[string]*Property{
 					"string_with_default": {
-						Type:    String,
+						Type:    PropertyType{String},
 						Default: "hello",
 					},
 					"int_with_default": {
-						Type:    Integer,
+						Type:    PropertyType{Integer},
 						Default: 42,
 					},
 					"float_with_default": {
-						Type:    Number,
+						Type:    PropertyType{Number},
 						Default: 3.14,
 					},
 					"bool_with_default": {
-						Type:    Boolean,
+						Type:    PropertyType{Boolean},
 						Default: true,
 					},
 					"required_string": {
-						Type:        String,
+						Type:        PropertyType{String},
 						Description: "required field",
 					},
 					"array_with_default": {
-						Type: Array,
+						Type: PropertyType{Array},
 						Items: &Property{
-							Type: String,
+							Type: PropertyType{String},
 						},
 						Default: "[\"item1\",\"item2\"]",
 					},

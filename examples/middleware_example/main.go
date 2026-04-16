@@ -145,14 +145,14 @@ func main() {
 		Name:        "hello",
 		Description: "Say hello to someone",
 		InputSchema: protocol.InputSchema{
-			Type: "object",
+			Type: protocol.Object,
 			Properties: map[string]*protocol.Property{
 				"name": {
-					Type:        protocol.String,
+					Type:        protocol.PropertyType{protocol.String},
 					Description: "Name to greet",
 				},
 				"auth_token": {
-					Type:        protocol.String,
+					Type:        protocol.PropertyType{protocol.String},
 					Description: "Authentication token (required)",
 				},
 			},
@@ -165,14 +165,14 @@ func main() {
 		Name:        "counter",
 		Description: "Count something",
 		InputSchema: protocol.InputSchema{
-			Type: "object",
+			Type: protocol.Object,
 			Properties: map[string]*protocol.Property{
 				"count": {
-					Type:        protocol.Number,
+					Type:        protocol.PropertyType{protocol.Number},
 					Description: "Number to count",
 				},
 				"auth_token": {
-					Type:        protocol.String,
+					Type:        protocol.PropertyType{protocol.String},
 					Description: "Authentication token (required)",
 				},
 			},
