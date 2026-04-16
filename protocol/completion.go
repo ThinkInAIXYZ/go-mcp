@@ -22,7 +22,7 @@ type ResourceReference struct {
 
 // CompleteResult represents the response to a completion request
 type CompleteResult struct {
-	Completion Complete `json:"completion"`
+	Completion *Complete `json:"completion"`
 }
 
 type Complete struct {
@@ -48,11 +48,7 @@ func NewCompleteRequest(argName string, argValue string, ref interface{}) *Compl
 // NewCompleteResult creates a new completion response
 func NewCompleteResult(values []string, hasMore bool, total int) *CompleteResult {
 	return &CompleteResult{
-		Completion: struct {
-			Values  []string `json:"values"`
-			HasMore bool     `json:"hasMore,omitempty"`
-			Total   int      `json:"total,omitempty"`
-		}{
+		Completion: &Complete{
 			Values:  values,
 			HasMore: hasMore,
 			Total:   total,

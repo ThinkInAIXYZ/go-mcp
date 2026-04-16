@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 	"github.com/ThinkInAIXYZ/go-mcp/server/session"
@@ -44,6 +46,36 @@ func WithLogger(logger pkg.Logger) Option {
 	}
 }
 
+// ToolMiddleware defines the middleware type of the tool handler
+// Allow ToolHandlerFunc to be wrapped like a chain call
+type ToolMiddleware func(ToolHandlerFunc) ToolHandlerFunc
+
+// RateLimitMiddleware Return a rate-limiting middleware
+func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
+	return func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			if limiter != nil && !limiter.Allow(req.Name) {
+				return nil, pkg.ErrRateLimitExceeded
+			}
+			return next(ctx, req)
+		}
+	}
+}
+
+func WithPagination(limit int) Option {
+	return func(s *Server) {
+		s.paginationLimit = limit
+	}
+}
+
+func WithGenSessionIDFunc(genSessionID func(context.Context) string) Option {
+	return func(s *Server) {
+		s.genSessionID = genSessionID
+	}
+}
+
+type ToolFilter func(context.Context, []*protocol.Tool) []*protocol.Tool
+
 type Server struct {
 	transport transport.ServerTransport
 
@@ -61,7 +93,15 @@ type Server struct {
 	serverInfo   *protocol.Implementation
 	instructions string
 
+	paginationLimit int
+
 	logger pkg.Logger
+
+	genSessionID func(ctx context.Context) string
+
+	globalMiddlewares []ToolMiddleware
+
+	toolFilters ToolFilter
 }
 
 func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
@@ -72,14 +112,15 @@ func NewServer(t transport.ServerTransport, opts ...Option) (*Server, error) {
 			Resources: &protocol.ResourcesCapability{ListChanged: true, Subscribe: true},
 			Tools:     &protocol.ToolsCapability{ListChanged: true},
 		},
-		inShutdown: pkg.NewAtomicBool(),
-		serverInfo: &protocol.Implementation{},
-		logger:     pkg.DefaultLogger,
+		inShutdown:   pkg.NewAtomicBool(),
+		serverInfo:   &protocol.Implementation{},
+		logger:       pkg.DefaultLogger,
+		genSessionID: func(context.Context) string { return uuid.NewString() },
 	}
 
 	t.SetReceiver(transport.ServerReceiverF(server.receive))
 
-	server.sessionManager = session.NewManager(server.sessionDetection)
+	server.sessionManager = session.NewManager(server.sessionDetection, server.genSessionID)
 
 	for _, opt := range opts {
 		opt(server)
@@ -105,6 +146,10 @@ func (server *Server) Run() error {
 	return nil
 }
 
+func (server *Server) SetToolFilter(filter ToolFilter) {
+	server.toolFilters = filter
+}
+
 type toolEntry struct {
 	tool    *protocol.Tool
 	handler ToolHandlerFunc
@@ -112,8 +157,14 @@ type toolEntry struct {
 
 type ToolHandlerFunc func(context.Context, *protocol.CallToolRequest) (*protocol.CallToolResult, error)
 
-func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc) {
-	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: toolHandler})
+func (server *Server) RegisterTool(tool *protocol.Tool, toolHandler ToolHandlerFunc, middlewares ...ToolMiddleware) {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		toolHandler = middlewares[i](toolHandler)
+	}
+
+	finalHandler := server.buildMiddlewareChain(toolHandler)
+
+	server.tools.Store(tool.Name, &toolEntry{tool: tool, handler: finalHandler})
 	if !server.sessionManager.IsEmpty() {
 		if err := server.sendNotification4ToolListChanges(context.Background()); err != nil {
 			server.logger.Warnf("send notification toll list changes fail: %v", err)
@@ -213,6 +264,22 @@ func (server *Server) UnregisterResourceTemplate(uriTemplate string) {
 			return
 		}
 	}
+}
+
+func (server *Server) Use(middlewares ...ToolMiddleware) {
+	server.globalMiddlewares = append(server.globalMiddlewares, middlewares...)
+}
+
+func (server *Server) buildMiddlewareChain(finalHandler ToolHandlerFunc) ToolHandlerFunc {
+	if len(server.globalMiddlewares) == 0 {
+		return finalHandler
+	}
+
+	handler := finalHandler
+	for i := len(server.globalMiddlewares) - 1; i >= 0; i-- {
+		handler = server.globalMiddlewares[i](handler)
+	}
+	return handler
 }
 
 func (server *Server) Shutdown(userCtx context.Context) error {

@@ -56,13 +56,13 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, pkg.ErrRequestInvalid
 	}
 
-	if sessionID != "" && req.Method != protocol.Initialize && req.Method != protocol.Ping {
-		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
-			return nil, pkg.ErrLackSession
-		} else if !s.GetReady() {
-			return nil, pkg.ErrSessionHasNotInitialized
-		}
-	}
+	// if sessionID != "" && req.Method != protocol.Initialize && req.Method != protocol.Ping {
+	// 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
+	// 		return nil, pkg.ErrLackSession
+	// 	} else if !s.GetReady() {
+	// 		return nil, pkg.ErrSessionHasNotInitialized
+	// 	}
+	// }
 
 	server.inFlyRequest.Add(1)
 
@@ -71,13 +71,30 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 		return nil, errors.New("server already shutdown")
 	}
 
-	ch := make(chan []byte, 1)
+	ch := make(chan []byte, 5)
 	go func(ctx context.Context) {
 		defer pkg.Recover()
 		defer server.inFlyRequest.Done()
 		defer close(ch)
 
+		if s, ok := server.sessionManager.GetSession(sessionID); ok && req.Method != protocol.Initialize {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithCancel(ctx)
+			requestID := fmt.Sprint(req.ID)
+			s.GetClientReqID2cancelFunc().Set(requestID, cancel)
+			defer s.GetClientReqID2cancelFunc().Remove(requestID)
+		}
+
+		if r := gjson.GetBytes(req.RawParams, fmt.Sprintf("_meta.%s", protocol.ProgressTokenKey)); r.Exists() {
+			ctx = setProgressTokenToCtx(ctx, r.Value())
+		}
+
+		ctx = setSendChanToCtx(ctx, ch)
+
 		resp := server.receiveRequest(ctx, sessionID, req)
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return
+		}
 		message, err := json.Marshal(resp)
 		if err != nil {
 			server.logger.Errorf("receive json marshal response:%+v error: %s", resp, err.Error())
@@ -89,7 +106,9 @@ func (server *Server) receive(ctx context.Context, sessionID string, msg []byte)
 }
 
 func (server *Server) receiveRequest(ctx context.Context, sessionID string, request *protocol.JSONRPCRequest) *protocol.JSONRPCResponse {
-	ctx = setSessionIDToCtx(ctx, sessionID)
+	if sessionID != "" {
+		ctx = setSessionIDToCtx(ctx, sessionID)
+	}
 
 	if request.Method != protocol.Ping {
 		server.sessionManager.UpdateSessionLastActiveAt(sessionID)
@@ -120,7 +139,7 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 	case protocol.ResourcesUnsubscribe:
 		result, err = server.handleRequestWithUnSubscribeResourceChange(sessionID, request.RawParams)
 	case protocol.ToolsList:
-		result, err = server.handleRequestWithListTools(request.RawParams)
+		result, err = server.handleRequestWithListTools(ctx, request.RawParams)
 	case protocol.ToolsCall:
 		result, err = server.handleRequestWithCallTool(ctx, request.RawParams)
 	default:
@@ -145,17 +164,19 @@ func (server *Server) receiveRequest(ctx context.Context, sessionID string, requ
 }
 
 func (server *Server) receiveNotify(sessionID string, notify *protocol.JSONRPCNotification) error {
-	if sessionID != "" {
-		if s, ok := server.sessionManager.GetSession(sessionID); !ok {
-			return pkg.ErrLackSession
-		} else if notify.Method != protocol.NotificationInitialized && !s.GetReady() {
-			return pkg.ErrSessionHasNotInitialized
-		}
-	}
+	// if sessionID != "" {
+	// 	if s, ok := server.sessionManager.GetSession(sessionID); !ok {
+	// 		return pkg.ErrLackSession
+	// 	} else if notify.Method != protocol.NotificationInitialized && !s.GetReady() {
+	// 		return pkg.ErrSessionHasNotInitialized
+	// 	}
+	// }
 
 	switch notify.Method {
 	case protocol.NotificationInitialized:
 		return server.handleNotifyWithInitialized(sessionID, notify.RawParams)
+	case protocol.NotificationCancelled:
+		return server.handleNotifyWithCancelled(sessionID, notify.RawParams)
 	default:
 		return fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, notify.Method)
 	}
@@ -167,7 +188,7 @@ func (server *Server) receiveResponse(sessionID string, response *protocol.JSONR
 		return pkg.ErrLackSession
 	}
 
-	respChan, ok := s.GetReqID2respChan().Get(fmt.Sprint(response.ID))
+	respChan, ok := s.GetServerReqID2respChan().Get(fmt.Sprint(response.ID))
 	if !ok {
 		return fmt.Errorf("%w: sessionID=%+v, requestID=%+v", pkg.ErrLackResponseChan, sessionID, response.ID)
 	}

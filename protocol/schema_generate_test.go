@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"reflect"
 	"slices"
 	"sort"
 	"testing"
@@ -16,6 +17,11 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 		Integer4Enum int     `json:"integer4enum,omitempty" enum:"1,2,3"`      // enum
 		Number4Enum  float64 `json:"number4enum,omitempty" enum:"1.1,2.2,3.3"` // enum
 		Number4Enum2 int     `json:"number4enum2,omitempty" enum:"1,2,3"`      // enum
+	}
+
+	type anonymousTestDataWrapper struct {
+		testData
+		ExtraField string `json:"extraField,omitempty" description:"extra string enum" enum:"a,b,c"`
 	}
 
 	type testData4InvalidInteger4Enum struct {
@@ -68,19 +74,19 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 					},
 					"string4enum": {
 						Type: PropertyType{String},
-						Enum: []string{"a", "b", "c"},
+						Enum: []any{"a", "b", "c"},
 					},
 					"integer4enum": {
 						Type: PropertyType{Integer},
-						Enum: []string{"1", "2", "3"},
+						Enum: []any{1, 2, 3},
 					},
 					"number4enum": {
 						Type: PropertyType{Number},
-						Enum: []string{"1.1", "2.2", "3.3"},
+						Enum: []any{1.1, 2.2, 3.3},
 					},
 					"number4enum2": {
 						Type: PropertyType{Integer},
-						Enum: []string{"1", "2", "3"},
+						Enum: []any{1, 2, 3},
 					},
 				},
 				Required: []string{"string"},
@@ -103,23 +109,74 @@ func TestGenerateSchemaFromReqStruct(t *testing.T) {
 					},
 					"string4enum": {
 						Type: PropertyType{String},
-						Enum: []string{"a", "b", "c"},
+						Enum: []any{"a", "b", "c"},
 					},
 					"integer4enum": {
 						Type: PropertyType{Integer},
-						Enum: []string{"1", "2", "3"},
+						Enum: []any{1, 2, 3},
 					},
 					"number4enum": {
 						Type: PropertyType{Number},
-						Enum: []string{"1.1", "2.2", "3.3"},
+						Enum: []any{1.1, 2.2, 3.3},
 					},
 					"number4enum2": {
 						Type: PropertyType{Integer},
-						Enum: []string{"1", "2", "3"},
+						Enum: []any{1, 2, 3},
 					},
 				},
 				Required: []string{"string"},
 			},
+		},
+		{
+			name: "anonymous nested struct type",
+			args: args{
+				v: anonymousTestDataWrapper{},
+			},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"string": {
+						Type:        PropertyType{String},
+						Description: "string",
+					},
+					"extraField": {
+						Type:        PropertyType{String},
+						Description: "extra string enum",
+						Enum:        []any{"a", "b", "c"},
+					},
+					"number": {
+						Type: PropertyType{Number},
+					},
+					"string4enum": {
+						Type: PropertyType{String},
+						Enum: []any{"a", "b", "c"},
+					},
+					"integer4enum": {
+						Type: PropertyType{Integer},
+						Enum: []any{1, 2, 3},
+					},
+					"number4enum": {
+						Type: PropertyType{Number},
+						Enum: []any{1.1, 2.2, 3.3},
+					},
+					"number4enum2": {
+						Type: PropertyType{Integer},
+						Enum: []any{1, 2, 3},
+					},
+				},
+				Required: []string{"string"},
+			},
+		},
+		{
+			name: "anonymous member collision",
+			args: args{
+				v: struct {
+					testData
+					String string `json:"string" description:"string"` // conflict with testData.string
+				}{},
+			},
+			want:    nil,
+			wantErr: true,
 		},
 		{
 			name: "invalid type for integer4Enum",
@@ -396,20 +453,131 @@ func compareProperty(a, b *Property) bool {
 	}
 
 	// 比较Enum字段
-	if len(a.Enum) != len(b.Enum) {
+	if !compareAnySlice(a.Enum, b.Enum) {
 		return false
 	}
-	aEnumCopy := make([]string, len(a.Enum))
-	bEnumCopy := make([]string, len(b.Enum))
-	copy(aEnumCopy, a.Enum)
-	copy(bEnumCopy, b.Enum)
-	sort.Strings(aEnumCopy)
-	sort.Strings(bEnumCopy)
-	for i := range aEnumCopy {
-		if aEnumCopy[i] != bEnumCopy[i] {
+
+	// 比较Default字段
+	if !reflect.DeepEqual(a.Default, b.Default) {
+		return false
+	}
+
+	return true
+}
+
+// compareAnySlice compares two []any slices for equality
+func compareAnySlice(a, b []any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Create copies for sorting
+	aCopy := make([]any, len(a))
+	bCopy := make([]any, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+
+	// Convert to string representations for sorting
+	aStrings := make([]string, len(aCopy))
+	bStrings := make([]string, len(bCopy))
+
+	for i, v := range aCopy {
+		aStrings[i] = reflect.ValueOf(v).String()
+	}
+	for i, v := range bCopy {
+		bStrings[i] = reflect.ValueOf(v).String()
+	}
+
+	sort.Strings(aStrings)
+	sort.Strings(bStrings)
+
+	for i := range aStrings {
+		if aStrings[i] != bStrings[i] {
 			return false
 		}
 	}
 
 	return true
+}
+
+func TestGenerateSchemaWithDefaultValues(t *testing.T) {
+	type testDataWithDefaults struct {
+		StringWithDefault string   `json:"string_with_default,omitempty" default:"hello"`
+		IntWithDefault    int      `json:"int_with_default,omitempty" default:"42"`
+		FloatWithDefault  float64  `json:"float_with_default,omitempty" default:"3.14"`
+		BoolWithDefault   bool     `json:"bool_with_default,omitempty" default:"true"`
+		RequiredString    string   `json:"required_string" description:"required field"`
+		ArrayWithDefault  []string `json:"array_with_default,omitempty" default:"[\"item1\",\"item2\"]"`
+	}
+
+	type testDataInvalidDefaults struct {
+		InvalidIntDefault   int     `json:"invalid_int,omitempty" default:"not_a_number"`
+		InvalidFloatDefault float64 `json:"invalid_float,omitempty" default:"not_a_float"`
+		InvalidBoolDefault  bool    `json:"invalid_bool,omitempty" default:"not_a_bool"`
+	}
+
+	tests := []struct {
+		name    string
+		input   any
+		want    *InputSchema
+		wantErr bool
+	}{
+		{
+			name:  "struct with valid default values",
+			input: testDataWithDefaults{},
+			want: &InputSchema{
+				Type: Object,
+				Properties: map[string]*Property{
+					"string_with_default": {
+						Type:    PropertyType{String},
+						Default: "hello",
+					},
+					"int_with_default": {
+						Type:    PropertyType{Integer},
+						Default: 42,
+					},
+					"float_with_default": {
+						Type:    PropertyType{Number},
+						Default: 3.14,
+					},
+					"bool_with_default": {
+						Type:    PropertyType{Boolean},
+						Default: true,
+					},
+					"required_string": {
+						Type:        PropertyType{String},
+						Description: "required field",
+					},
+					"array_with_default": {
+						Type: PropertyType{Array},
+						Items: &Property{
+							Type: PropertyType{String},
+						},
+						Default: "[\"item1\",\"item2\"]",
+					},
+				},
+				Required: []string{"required_string"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "struct with invalid int default",
+			input:   testDataInvalidDefaults{},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := generateSchemaFromReqStruct(tt.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("generateSchemaFromReqStruct() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !compareInputSchema(got, tt.want) {
+				t.Errorf("generateSchemaFromReqStruct() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

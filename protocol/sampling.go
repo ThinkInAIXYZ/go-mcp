@@ -9,7 +9,7 @@ import (
 
 // CreateMessageRequest represents a request to create a message through sampling
 type CreateMessageRequest struct {
-	Messages         []SamplingMessage      `json:"messages"`
+	Messages         []*SamplingMessage     `json:"messages"`
 	MaxTokens        int                    `json:"maxTokens"`
 	Temperature      float64                `json:"temperature,omitempty"`
 	StopSequences    []string               `json:"stopSequences,omitempty"`
@@ -107,7 +107,7 @@ func (r *CreateMessageResult) UnmarshalJSON(data []byte) error {
 }
 
 // NewCreateMessageRequest creates a new create message request
-func NewCreateMessageRequest(messages []SamplingMessage, maxTokens int, opts ...CreateMessageOption) *CreateMessageRequest {
+func NewCreateMessageRequest(messages []*SamplingMessage, maxTokens int, opts ...CreateMessageOption) *CreateMessageRequest {
 	req := &CreateMessageRequest{
 		Messages:  messages,
 		MaxTokens: maxTokens,

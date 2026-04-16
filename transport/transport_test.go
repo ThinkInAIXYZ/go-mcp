@@ -19,7 +19,7 @@ func newMockSessionManager() *mockSessionManager {
 	return &mockSessionManager{}
 }
 
-func (m *mockSessionManager) CreateSession() string {
+func (m *mockSessionManager) CreateSession(context.Context) string {
 	sessionID := uuid.NewString()
 	m.Store(sessionID, nil)
 	return sessionID
@@ -63,8 +63,7 @@ func (m *mockSessionManager) DequeueMessageForSend(ctx context.Context, sessionI
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case msg, ok := <-ch:
-		if msg == nil && !ok {
-			// There are no new messages and the chan has been closed, indicating that the request may need to be terminated.
+		if !ok {
 			return nil, pkg.ErrSendEOF
 		}
 		return msg, nil
@@ -94,6 +93,7 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 		expectedMsgWithServerCh <- string(msg)
 		msgCh := make(chan []byte, 1)
 		go func() {
+			defer close(msgCh)
 			msgCh <- msg
 		}()
 		return msgCh, nil
@@ -101,9 +101,11 @@ func testTransport(t *testing.T, client ClientTransport, server ServerTransport)
 	server.SetSessionManager(newMockSessionManager())
 
 	expectedMsgWithClientCh := make(chan string, 1)
-	client.SetReceiver(ClientReceiverF(func(_ context.Context, msg []byte) error {
+	client.SetReceiver(NewClientReceiver(func(_ context.Context, msg []byte) error {
 		expectedMsgWithClientCh <- string(msg)
 		return nil
+	}, func(_ error) {
+		close(expectedMsgWithClientCh)
 	}))
 
 	errCh := make(chan error, 1)

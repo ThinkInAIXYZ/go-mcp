@@ -23,7 +23,9 @@ type State struct {
 
 	requestID int64
 
-	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
+	serverReqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
+
+	clientReqID2cancelFunc cmap.ConcurrentMap[string, context.CancelFunc]
 
 	// cache client initialize request info
 	clientInfo         *protocol.Implementation
@@ -39,12 +41,13 @@ type State struct {
 
 func NewState() *State {
 	return &State{
-		lastActiveAt:        time.Now(),
-		reqID2respChan:      cmap.New[chan *protocol.JSONRPCResponse](),
-		subscribedResources: cmap.New[struct{}](),
-		receivedInitRequest: pkg.NewAtomicBool(),
-		ready:               pkg.NewAtomicBool(),
-		closed:              pkg.NewAtomicBool(),
+		lastActiveAt:           time.Now(),
+		serverReqID2respChan:   cmap.New[chan *protocol.JSONRPCResponse](),
+		clientReqID2cancelFunc: cmap.New[context.CancelFunc](),
+		subscribedResources:    cmap.New[struct{}](),
+		receivedInitRequest:    pkg.NewAtomicBool(),
+		ready:                  pkg.NewAtomicBool(),
+		closed:                 pkg.NewAtomicBool(),
 	}
 }
 
@@ -77,8 +80,12 @@ func (s *State) IncRequestID() int64 {
 	return atomic.AddInt64(&s.requestID, 1)
 }
 
-func (s *State) GetReqID2respChan() cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse] {
-	return s.reqID2respChan
+func (s *State) GetServerReqID2respChan() cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse] {
+	return s.serverReqID2respChan
+}
+
+func (s *State) GetClientReqID2cancelFunc() cmap.ConcurrentMap[string, context.CancelFunc] {
+	return s.clientReqID2cancelFunc
 }
 
 func (s *State) GetSubscribedResources() cmap.ConcurrentMap[string, struct{}] {
@@ -141,8 +148,7 @@ func (s *State) dequeueMessage(ctx context.Context) ([]byte, error) {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case msg, ok := <-s.sendChan:
-		if msg == nil && !ok {
-			// There are no new messages and the chan has been closed, indicating that the request may need to be terminated.
+		if !ok {
 			return nil, pkg.ErrSendEOF
 		}
 		return msg, nil

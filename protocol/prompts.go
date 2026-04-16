@@ -8,19 +8,25 @@ import (
 )
 
 // ListPromptsRequest represents a request to list available prompts
-type ListPromptsRequest struct{}
+type ListPromptsRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListPromptsResult represents the response to a list prompts request
 type ListPromptsResult struct {
-	Prompts    []Prompt `json:"prompts"`
-	NextCursor string   `json:"nextCursor,omitempty"`
+	Prompts    []*Prompt `json:"prompts"`
+	NextCursor Cursor    `json:"nextCursor,omitempty"`
 }
 
 // Prompt related types
 type Prompt struct {
-	Name        string           `json:"name"`
-	Description string           `json:"description,omitempty"`
-	Arguments   []PromptArgument `json:"arguments,omitempty"`
+	Name        string            `json:"name"`
+	Description string            `json:"description,omitempty"`
+	Arguments   []*PromptArgument `json:"arguments,omitempty"`
+}
+
+func (p *Prompt) GetName() string {
+	return p.Name
 }
 
 type PromptArgument struct {
@@ -37,8 +43,8 @@ type GetPromptRequest struct {
 
 // GetPromptResult represents the response to a get prompt request
 type GetPromptResult struct {
-	Messages    []PromptMessage `json:"messages"`
-	Description string          `json:"description,omitempty"`
+	Messages    []*PromptMessage `json:"messages"`
+	Description string           `json:"description,omitempty"`
 }
 
 type PromptMessage struct {
@@ -101,7 +107,7 @@ func NewListPromptsRequest() *ListPromptsRequest {
 }
 
 // NewListPromptsResult creates a new list prompts response
-func NewListPromptsResult(prompts []Prompt, nextCursor string) *ListPromptsResult {
+func NewListPromptsResult(prompts []*Prompt, nextCursor Cursor) *ListPromptsResult {
 	return &ListPromptsResult{
 		Prompts:    prompts,
 		NextCursor: nextCursor,
@@ -117,7 +123,7 @@ func NewGetPromptRequest(name string, arguments map[string]string) *GetPromptReq
 }
 
 // NewGetPromptResult creates a new get prompt response
-func NewGetPromptResult(messages []PromptMessage, description string) *GetPromptResult {
+func NewGetPromptResult(messages []*PromptMessage, description string) *GetPromptResult {
 	return &GetPromptResult{
 		Messages:    messages,
 		Description: description,

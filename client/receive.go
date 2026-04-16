@@ -11,18 +11,28 @@ import (
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
 )
 
-func (client *Client) receive(_ context.Context, msg []byte) error {
+func (client *Client) receive(ctx context.Context, msg []byte) error {
 	defer pkg.Recover()
+
+	ctx = pkg.NewCancelShieldContext(ctx)
 
 	if !gjson.GetBytes(msg, "id").Exists() {
 		notify := &protocol.JSONRPCNotification{}
 		if err := pkg.JSONUnmarshal(msg, &notify); err != nil {
 			return err
 		}
+		if notify.Method == protocol.NotificationProgress { // need sync handle
+			if err := client.receiveNotify(ctx, notify); err != nil {
+				notify.RawParams = nil // simplified log
+				client.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
+				return err
+			}
+			return nil
+		}
 		go func() {
 			defer pkg.Recover()
 
-			if err := client.receiveNotify(context.Background(), notify); err != nil {
+			if err := client.receiveNotify(ctx, notify); err != nil {
 				notify.RawParams = nil // simplified log
 				client.logger.Errorf("receive notify:%+v error: %s", notify, err.Error())
 				return
@@ -37,15 +47,11 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 		if err := pkg.JSONUnmarshal(msg, &resp); err != nil {
 			return err
 		}
-		go func() {
-			defer pkg.Recover()
-
-			if err := client.receiveResponse(resp); err != nil {
-				resp.RawResult = nil // simplified log
-				client.logger.Errorf("receive response:%+v error: %s", resp, err.Error())
-				return
-			}
-		}()
+		if err := client.receiveResponse(resp); err != nil {
+			resp.RawResult = nil // simplified log
+			client.logger.Errorf("receive response:%+v error: %s", resp, err.Error())
+			return err
+		}
 		return nil
 	}
 
@@ -59,7 +65,7 @@ func (client *Client) receive(_ context.Context, msg []byte) error {
 	go func() {
 		defer pkg.Recover()
 
-		if err := client.receiveRequest(context.Background(), req); err != nil {
+		if err := client.receiveRequest(ctx, req); err != nil {
 			req.RawParams = nil // simplified log
 			client.logger.Errorf("receive request:%+v error: %s", req, err.Error())
 			return
@@ -110,6 +116,8 @@ func (client *Client) receiveNotify(ctx context.Context, notify *protocol.JSONRP
 		return client.handleNotifyWithResourcesListChanged(ctx, notify.RawParams)
 	case protocol.NotificationResourcesUpdated:
 		return client.handleNotifyWithResourcesUpdated(ctx, notify.RawParams)
+	case protocol.NotificationProgress:
+		return client.handleNotifyWithProgress(ctx, notify.RawParams)
 	default:
 		return fmt.Errorf("%w: method=%s", pkg.ErrMethodNotSupport, notify.Method)
 	}
@@ -127,4 +135,13 @@ func (client *Client) receiveResponse(response *protocol.JSONRPCResponse) error 
 		return fmt.Errorf("%w: response=%+v", pkg.ErrDuplicateResponseReceived, response)
 	}
 	return nil
+}
+
+func (client *Client) receiveInterrupt(err error) {
+	for reqID, respChan := range client.reqID2respChan.Items() {
+		select {
+		case respChan <- protocol.NewJSONRPCErrorResponse(reqID, protocol.ConnectionError, err.Error()):
+		default:
+		}
+	}
 }

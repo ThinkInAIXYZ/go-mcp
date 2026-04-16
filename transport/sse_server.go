@@ -43,6 +43,12 @@ func WithSSEServerTransportOptionURLPrefix(urlPrefix string) SSEServerTransportO
 
 type SSEServerTransportAndHandlerOption func(*sseServerTransport)
 
+func WithSSEServerTransportAndHandlerOptionCopyParamKeys(paramsKey []string) SSEServerTransportAndHandlerOption {
+	return func(t *sseServerTransport) {
+		t.copyParamKeys = paramsKey
+	}
+}
+
 func WithSSEServerTransportAndHandlerOptionLogger(logger pkg.Logger) SSEServerTransportAndHandlerOption {
 	return func(t *sseServerTransport) {
 		t.logger = logger
@@ -68,10 +74,11 @@ type sseServerTransport struct {
 	sessionManager sessionManager
 
 	// options
-	logger      pkg.Logger
-	ssePath     string
-	messagePath string
-	urlPrefix   string
+	logger        pkg.Logger
+	ssePath       string
+	messagePath   string
+	urlPrefix     string
+	copyParamKeys []string
 }
 
 type SSEHandler struct {
@@ -218,10 +225,15 @@ func (t *sseServerTransport) handleSSE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 
 	// Create an SSE connection
-	sessionID := t.sessionManager.CreateSession()
+	sessionID := t.sessionManager.CreateSession(r.Context())
 	defer t.sessionManager.CloseSession(sessionID)
 
 	uri := fmt.Sprintf("%s?sessionID=%s", t.messageEndpointURL, sessionID)
+
+	for _, key := range t.copyParamKeys {
+		uri += fmt.Sprintf("&%s=%s", key, r.URL.Query().Get(key))
+	}
+
 	// Send the initial endpoint event
 	if _, err := fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", uri); err != nil {
 		t.logger.Errorf("send endpoint message fail")
@@ -279,8 +291,7 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx := pkg.NewCancelShieldContext(r.Context())
-	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, inputMsg)
+	outputMsgCh, err := t.receiver.Receive(r.Context(), sessionID, inputMsg)
 	if err != nil {
 		t.writeError(w, http.StatusBadRequest, fmt.Sprintf("Failed to receive: %v", err))
 		return
@@ -296,13 +307,10 @@ func (t *sseServerTransport) handleMessage(w http.ResponseWriter, r *http.Reques
 	go func() {
 		defer pkg.Recover()
 
-		msg := <-outputMsgCh
-		if len(msg) == 0 {
-			t.logger.Errorf("handle request fail")
-			return
-		}
-		if err := t.Send(context.Background(), sessionID, msg); err != nil {
-			t.logger.Errorf("Failed to send message: %v", err)
+		for msg := range outputMsgCh {
+			if e := t.Send(context.Background(), sessionID, msg); e != nil {
+				t.logger.Errorf("Failed to send message: %v", e)
+			}
 		}
 	}()
 }

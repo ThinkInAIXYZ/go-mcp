@@ -3,6 +3,8 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"time"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 	"github.com/ThinkInAIXYZ/go-mcp/protocol"
@@ -63,4 +65,30 @@ func (client *Client) handleNotifyWithResourcesUpdated(ctx context.Context, rawP
 		}
 	}
 	return client.notifyHandler.ResourcesUpdated(ctx, notify)
+}
+
+func (client *Client) handleNotifyWithProgress(ctx context.Context, rawParams json.RawMessage) error {
+	notify := &protocol.ProgressNotification{}
+	if len(rawParams) > 0 {
+		if err := pkg.JSONUnmarshal(rawParams, notify); err != nil {
+			return err
+		}
+	}
+	client.progressChanRW.RLock()
+	defer client.progressChanRW.RUnlock()
+
+	ch, ok := client.progressToken2notifyChan[fmt.Sprint(notify.ProgressToken)]
+	if !ok {
+		return fmt.Errorf("progress token not found")
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*1)
+	defer cancel()
+
+	select {
+	case ch <- notify:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
 }

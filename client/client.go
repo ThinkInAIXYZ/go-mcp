@@ -27,9 +27,9 @@ func WithSamplingHandler(handler SamplingHandler) Option {
 	}
 }
 
-func WithClientInfo(info protocol.Implementation) Option {
+func WithClientInfo(info *protocol.Implementation) Option {
 	return func(s *Client) {
-		s.clientInfo = &info
+		s.clientInfo = info
 	}
 }
 
@@ -49,6 +49,9 @@ type Client struct {
 	transport transport.ClientTransport
 
 	reqID2respChan cmap.ConcurrentMap[string, chan *protocol.JSONRPCResponse]
+
+	progressChanRW           sync.RWMutex
+	progressToken2notifyChan map[string]chan<- *protocol.ProgressNotification
 
 	samplingHandler SamplingHandler
 
@@ -75,16 +78,17 @@ type Client struct {
 
 func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 	client := &Client{
-		transport:          t,
-		reqID2respChan:     cmap.New[chan *protocol.JSONRPCResponse](),
-		ready:              pkg.NewAtomicBool(),
-		clientInfo:         &protocol.Implementation{},
-		clientCapabilities: &protocol.ClientCapabilities{},
-		initTimeout:        time.Second * 30,
-		closed:             make(chan struct{}),
-		logger:             pkg.DefaultLogger,
+		transport:                t,
+		reqID2respChan:           cmap.New[chan *protocol.JSONRPCResponse](),
+		progressToken2notifyChan: make(map[string]chan<- *protocol.ProgressNotification),
+		ready:                    pkg.NewAtomicBool(),
+		clientInfo:               &protocol.Implementation{},
+		clientCapabilities:       &protocol.ClientCapabilities{},
+		initTimeout:              time.Second * 30,
+		closed:                   make(chan struct{}),
+		logger:                   pkg.DefaultLogger,
 	}
-	t.SetReceiver(transport.ClientReceiverF(client.receive))
+	t.SetReceiver(transport.NewClientReceiver(client.receive, client.receiveInterrupt))
 
 	for _, opt := range opts {
 		opt(client)
@@ -107,7 +111,7 @@ func NewClient(t transport.ClientTransport, opts ...Option) (*Client, error) {
 		return nil, fmt.Errorf("init mcp client transpor start fail: %w", err)
 	}
 
-	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(*client.clientInfo, *client.clientCapabilities)); err != nil {
+	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(client.clientInfo, client.clientCapabilities)); err != nil {
 		return nil, err
 	}
 

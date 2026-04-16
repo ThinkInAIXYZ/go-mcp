@@ -8,12 +8,34 @@ import (
 )
 
 // ListToolsRequest represents a request to list available tools
-type ListToolsRequest struct{}
+type ListToolsRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListToolsResult represents the response to a list tools request
 type ListToolsResult struct {
 	Tools      []*Tool `json:"tools"`
-	NextCursor string  `json:"nextCursor,omitempty"`
+	NextCursor Cursor  `json:"nextCursor,omitempty"`
+}
+
+// ToolAnnotations contains hints about the tool's behavior
+type ToolAnnotations struct {
+	// Title is a human-readable title for the tool, useful for UI display
+	Title string `json:"title,omitempty"`
+
+	// ReadOnlyHint indicates the tool does not modify its environment
+	ReadOnlyHint *bool `json:"readOnlyHint,omitempty"`
+
+	// DestructiveHint indicates the tool may perform destructive updates
+	// (only meaningful when ReadOnlyHint is false)
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
+
+	// IdempotentHint indicates calling the tool repeatedly with the same arguments
+	// has no additional effect (only meaningful when ReadOnlyHint is false)
+	IdempotentHint *bool `json:"idempotentHint,omitempty"`
+
+	// OpenWorldHint indicates the tool may interact with an "open world" of external entities
+	OpenWorldHint *bool `json:"openWorldHint,omitempty"`
 }
 
 // Tool represents a tool definition that the client can call
@@ -27,11 +49,25 @@ type Tool struct {
 	// InputSchema defines the expected parameters for the tool using JSON Schema
 	InputSchema InputSchema `json:"inputSchema"`
 
+	// OutputSchema defines expected output structure for the tool using Optional JSON Schema
+	OutputSchema OutputSchema `json:"outputSchema"`
+
+	// Annotations provides additional hints about the tool's behavior
+	Annotations *ToolAnnotations `json:"annotations,omitempty"`
+
 	RawInputSchema json.RawMessage `json:"-"`
 }
 
+/*func (t *Tool) GetName() string {
+	return t.Name
+}*/
+
+func (t *Tool) GetName() string {
+	return t.Name
+}
+
 func (t *Tool) MarshalJSON() ([]byte, error) {
-	m := make(map[string]interface{}, 3)
+	m := make(map[string]interface{}, 4)
 
 	m["name"] = t.Name
 	if t.Description != "" {
@@ -49,6 +85,15 @@ func (t *Tool) MarshalJSON() ([]byte, error) {
 		m["inputSchema"] = t.InputSchema
 	}
 
+	if t.OutputSchema.Properties != nil {
+		m["outputSchema"] = t.OutputSchema
+	}
+
+	// Add annotations if present
+	if t.Annotations != nil {
+		m["annotations"] = t.Annotations
+	}
+
 	return json.Marshal(m)
 }
 
@@ -63,8 +108,12 @@ type InputSchema struct {
 	Required   []string             `json:"required,omitempty"`
 }
 
+// OutputSchema represents a Optional JSON Schema object defining expected output structure for a tool
+type OutputSchema InputSchema
+
 // CallToolRequest represents a request to call a specific tool
 type CallToolRequest struct {
+	Meta         map[string]interface{} `json:"_meta,omitempty"`
 	Name         string                 `json:"name"`
 	Arguments    map[string]interface{} `json:"arguments,omitempty"`
 	RawArguments json.RawMessage        `json:"-"`
@@ -158,6 +207,13 @@ func (r *CallToolResult) UnmarshalJSON(data []byte) error {
 			continue
 		}
 
+		// Try to unmarshal content as ResourceLink
+		var resourceLink *ResourceLink
+		if err := pkg.JSONUnmarshal(content, &resourceLink); err == nil {
+			r.Content[i] = resourceLink
+			continue
+		}
+
 		// Try to unmarshal content as embeddedResource
 		var embeddedResource *EmbeddedResource
 		if err := pkg.JSONUnmarshal(content, &embeddedResource); err == nil {
@@ -204,7 +260,7 @@ func NewListToolsRequest() *ListToolsRequest {
 }
 
 // NewListToolsResult creates a new list tools response
-func NewListToolsResult(tools []*Tool, nextCursor string) *ListToolsResult {
+func NewListToolsResult(tools []*Tool, nextCursor Cursor) *ListToolsResult {
 	return &ListToolsResult{
 		Tools:      tools,
 		NextCursor: nextCursor,

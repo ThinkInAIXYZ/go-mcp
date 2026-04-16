@@ -10,25 +10,29 @@ import (
 )
 
 // ListResourcesRequest Sent from the client to request a list of resources the server has.
-type ListResourcesRequest struct{}
+type ListResourcesRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListResourcesResult The server's response to a resources/list request from the client.
 type ListResourcesResult struct {
-	Resources []Resource `json:"resources"`
+	Resources []*Resource `json:"resources"`
 	/**
 	 * An opaque token representing the pagination position after the last returned result.
 	 * If present, there may be more results available.
 	 */
-	NextCursor string `json:"nextCursor,omitempty"`
+	NextCursor Cursor `json:"nextCursor,omitempty"`
 }
 
 // ListResourceTemplatesRequest represents a request to list resource templates
-type ListResourceTemplatesRequest struct{}
+type ListResourceTemplatesRequest struct {
+	Cursor Cursor `json:"cursor,omitempty"`
+}
 
 // ListResourceTemplatesResult represents the response to a list resource templates request
 type ListResourceTemplatesResult struct {
-	ResourceTemplates []ResourceTemplate `json:"resourceTemplates"`
-	NextCursor        string             `json:"nextCursor,omitempty"`
+	ResourceTemplates []*ResourceTemplate `json:"resourceTemplates"`
+	NextCursor        Cursor              `json:"nextCursor,omitempty"`
 }
 
 // ReadResourceRequest represents a request to read a specific resource
@@ -58,14 +62,14 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	r.Contents = make([]ResourceContents, len(aux.Contents))
 	for i, content := range aux.Contents {
 		// Try to unmarshal content as TextResourceContents first
-		var textContent TextResourceContents
+		var textContent *TextResourceContents
 		if err := pkg.JSONUnmarshal(content, &textContent); err == nil {
 			r.Contents[i] = textContent
 			continue
 		}
 
 		// Try to unmarshal content as BlobResourceContents
-		var blobContent BlobResourceContents
+		var blobContent *BlobResourceContents
 		if err := pkg.JSONUnmarshal(content, &blobContent); err == nil {
 			r.Contents[i] = blobContent
 			continue
@@ -77,7 +81,7 @@ func (r *ReadResourceResult) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Resource  A known resource that the server is capable of reading.
+// Resource A known resource that the server is capable of reading.
 type Resource struct {
 	Annotated
 	// Name A human-readable name for this resource. This can be used by clients to populate UI elements.
@@ -93,6 +97,10 @@ type Resource struct {
 	Size     int64  `json:"size,omitempty"`
 }
 
+func (r *Resource) GetName() string {
+	return r.Name
+}
+
 type ResourceTemplate struct {
 	Annotated
 	Name              string                `json:"name"`
@@ -100,6 +108,10 @@ type ResourceTemplate struct {
 	URITemplateParsed *uritemplate.Template `json:"-"`
 	Description       string                `json:"description,omitempty"`
 	MimeType          string                `json:"mimeType,omitempty"`
+}
+
+func (t *ResourceTemplate) GetName() string {
+	return t.Name
 }
 
 func (t *ResourceTemplate) UnmarshalJSON(data []byte) error {
@@ -198,6 +210,19 @@ func (i *AudioContent) GetType() string {
 	return "audio"
 }
 
+type ResourceLink struct {
+	Annotated
+	Type        string `json:"type"` // Must be "resource_link"
+	URI         string `json:"uri"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	MIMEType    string `json:"mimeType"`
+}
+
+func (r *ResourceLink) GetType() string {
+	return "resource_link"
+}
+
 // EmbeddedResource represents the contents of a resource, embedded into a prompt or tool call result.
 // It is up to the client how best to render embedded resources for the benefit of the LLM and/or the user.
 type EmbeddedResource struct {
@@ -230,11 +255,11 @@ type TextResourceContents struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 
-func (t TextResourceContents) GetURI() string {
+func (t *TextResourceContents) GetURI() string {
 	return t.URI
 }
 
-func (t TextResourceContents) GetMimeType() string {
+func (t *TextResourceContents) GetMimeType() string {
 	return t.MimeType
 }
 
@@ -244,11 +269,11 @@ type BlobResourceContents struct {
 	MimeType string `json:"mimeType,omitempty"`
 }
 
-func (b BlobResourceContents) GetURI() string {
+func (b *BlobResourceContents) GetURI() string {
 	return b.URI
 }
 
-func (b BlobResourceContents) GetMimeType() string {
+func (b *BlobResourceContents) GetMimeType() string {
 	return b.MimeType
 }
 
@@ -282,7 +307,7 @@ func NewListResourcesRequest() *ListResourcesRequest {
 }
 
 // NewListResourcesResult creates a new list resources response
-func NewListResourcesResult(resources []Resource, nextCursor string) *ListResourcesResult {
+func NewListResourcesResult(resources []*Resource, nextCursor Cursor) *ListResourcesResult {
 	return &ListResourcesResult{
 		Resources:  resources,
 		NextCursor: nextCursor,
@@ -295,7 +320,7 @@ func NewListResourceTemplatesRequest() *ListResourceTemplatesRequest {
 }
 
 // NewListResourceTemplatesResult creates a new list resource templates response
-func NewListResourceTemplatesResult(templates []ResourceTemplate, nextCursor string) *ListResourceTemplatesResult {
+func NewListResourceTemplatesResult(templates []*ResourceTemplate, nextCursor Cursor) *ListResourceTemplatesResult {
 	return &ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 		NextCursor:        nextCursor,

@@ -51,7 +51,7 @@ const (
 
 	// progress related methods
 	NotificationProgress  Method = "notifications/progress"
-	NotificationCancelled Method = "notifications/canceled"
+	NotificationCancelled Method = "notifications/cancelled" // nolint:misspell
 )
 
 // Role represents the sender or recipient of messages and data in a conversation

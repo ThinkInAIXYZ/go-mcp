@@ -40,7 +40,7 @@ func (t *mockServerTransport) Run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
-	t.sessionID = t.sessionManager.CreateSession()
+	t.sessionID = t.sessionManager.CreateSession(context.Background())
 
 	t.startReceive(ctx)
 
@@ -119,13 +119,10 @@ func (t *mockServerTransport) receive(ctx context.Context, line []byte) {
 	go func() {
 		defer pkg.Recover()
 
-		msg := <-outputMsgCh
-		if len(msg) == 0 {
-			t.logger.Errorf("handle request fail")
-			return
-		}
-		if err := t.Send(context.Background(), t.sessionID, msg); err != nil {
-			t.logger.Errorf("Failed to send message: %v", err)
+		for msg := range outputMsgCh {
+			if e := t.Send(context.Background(), t.sessionID, msg); e != nil {
+				t.logger.Errorf("Failed to send message: %v", e)
+			}
 		}
 	}()
 }

@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
 
@@ -15,14 +13,17 @@ type Manager struct {
 
 	stopHeartbeat chan struct{}
 
+	genSessionID func(ctx context.Context) string
+
 	logger pkg.Logger
 
 	detection   func(ctx context.Context, sessionID string) error
 	maxIdleTime time.Duration
 }
 
-func NewManager(detection func(ctx context.Context, sessionID string) error) *Manager {
+func NewManager(detection func(ctx context.Context, sessionID string) error, genSessionID func(ctx context.Context) string) *Manager {
 	return &Manager{
+		genSessionID:  genSessionID,
 		detection:     detection,
 		stopHeartbeat: make(chan struct{}),
 		logger:        pkg.DefaultLogger,
@@ -37,8 +38,8 @@ func (m *Manager) SetLogger(logger pkg.Logger) {
 	m.logger = logger
 }
 
-func (m *Manager) CreateSession() string {
-	sessionID := uuid.NewString()
+func (m *Manager) CreateSession(ctx context.Context) string {
+	sessionID := m.genSessionID(ctx)
 	state := NewState()
 	m.activeSessions.Store(sessionID, state)
 	return sessionID

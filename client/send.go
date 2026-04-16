@@ -93,7 +93,7 @@ func (client *Client) againInitialization(ctx context.Context) error {
 		return nil
 	}
 
-	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(*client.clientInfo, *client.clientCapabilities)); err != nil {
+	if _, err := client.initialization(ctx, protocol.NewInitializeRequest(client.clientInfo, client.clientCapabilities)); err != nil {
 		return err
 	}
 	client.ready.Store(true)

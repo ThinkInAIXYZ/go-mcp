@@ -17,6 +17,7 @@ const (
 	InternalError  = -32603 // Internal JSON-RPC error
 
 	// 可以定义自己的错误代码，范围在-32000 以上。
+	ConnectionError = -32400
 )
 
 type RequestID interface{} // 字符串/数值

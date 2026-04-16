@@ -50,31 +50,23 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	// 创建令牌桶限速器
-	limiter := pkg.NewTokenBucketLimiter(pkg.Rate{
-		Limit: 10.0, // 每秒10个请求
-		Burst: 20,   // 最多允许20个请求的突发
-	})
 	tool1, err := protocol.NewTool("current_time", "Get current time with timezone, Asia/Shanghai is default", currentTimeReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
-	limiter.SetToolLimit(tool1.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	tool2, err := protocol.NewTool("delete_file", "delete file", deleteFileReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
-	limiter.SetToolLimit(tool2.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	tool3, err := protocol.NewTool("generate_ppt", "generate PPT", generatePPTReq{})
 	if err != nil {
 		log.Fatalf("Failed to create tool: %v", err)
 		return
 	}
-	limiter.SetToolLimit(tool3.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	rawSchema := []byte(`{
 		"type": "object",
@@ -87,7 +79,6 @@ func main() {
 		"required": ["file_name"]
 	}`)
 	tool4 := protocol.NewToolWithRawSchema("update_file", "update file", rawSchema)
-	limiter.SetToolLimit(tool4.Name, pkg.Rate{Limit: 1.0, Burst: 1})
 
 	testResource := &protocol.Resource{
 		URI:      "file:///test.txt",
@@ -100,12 +91,11 @@ func main() {
 		Text:     "test",
 	}
 
-	rateLimit := server.RateLimitMiddleware(limiter)
 	// register tool and start mcp server
-	srv.RegisterTool(tool1, currentTime, rateLimit)
-	srv.RegisterTool(tool2, deleteFile, rateLimit)
-	srv.RegisterTool(tool3, generatePPT, rateLimit)
-	srv.RegisterTool(tool4, updateFile, rateLimit)
+	srv.RegisterTool(tool1, currentTime)
+	srv.RegisterTool(tool2, deleteFile)
+	srv.RegisterTool(tool3, generatePPT)
+	srv.RegisterTool(tool4, updateFile)
 	srv.RegisterResource(testResource, func(context.Context, *protocol.ReadResourceRequest) (*protocol.ReadResourceResult, error) {
 		return &protocol.ReadResourceResult{
 			Contents: []protocol.ResourceContents{
@@ -113,8 +103,14 @@ func main() {
 			},
 		}, nil
 	})
-	// srv.RegisterPrompt()
-	// srv.RegisterResourceTemplate()
+
+	// filtering tools
+	srv.SetToolFilter(func(_ context.Context, _ []*protocol.Tool) []*protocol.Tool {
+		return []*protocol.Tool{
+			tool1,
+			tool2,
+		}
+	})
 
 	errCh := make(chan error)
 	go func() {

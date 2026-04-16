@@ -77,7 +77,9 @@ type Property struct {
 	// Properties describes the properties of an object, if the schema type is Object.
 	Properties map[string]*Property `json:"properties,omitempty"`
 	Required   []string             `json:"required,omitempty"`
-	Enum       []string             `json:"enum,omitempty"`
+	Enum       []any                `json:"enum,omitempty"`
+	// Default specifies the default value for the property.
+	Default any `json:"default,omitempty"`
 }
 
 var schemaCache = pkg.SyncMap[*InputSchema]{}
@@ -120,13 +122,19 @@ func getTypeUUID(t reflect.Type) string {
 
 func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 	var (
-		properties     = make(map[string]*Property)
-		requiredFields = make([]string, 0)
-		enumValues     = make([]string, 0)
+		properties      = make(map[string]*Property)
+		requiredFields  = make([]string, 0)
+		anonymousFields = make([]reflect.StructField, 0)
 	)
 
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
+
+		if field.Anonymous {
+			anonymousFields = append(anonymousFields, field)
+			continue
+		}
+
 		if !field.IsExported() {
 			continue
 		}
@@ -165,37 +173,103 @@ func reflectSchemaByObject(t reflect.Type) (*Property, error) {
 		}
 
 		if v := field.Tag.Get("enum"); v != "" {
-			enumValues = strings.Split(v, ",")
-			for i := range enumValues {
-				enumValues[i] = strings.TrimSpace(enumValues[i])
-			}
+			enumStrings := strings.Split(v, ",")
+			enumValues := make([]any, len(enumStrings))
 
-			// Check if enum values are consistent with the field type
-			for _, value := range enumValues {
+			for j, value := range enumStrings {
+				value = strings.TrimSpace(value)
+
+				// Convert string values to appropriate types based on field type
 				switch field.Type.Kind() {
 				case reflect.String:
-					// No additional processing required for string type
-				case reflect.Int, reflect.Int64:
-					if _, err := strconv.Atoi(value); err != nil {
-						return nil, fmt.Errorf("enum value %q is not compatible with type %v", value, field.Type)
+					enumValues[j] = value
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					intVal, err := strconv.Atoi(value)
+					if err != nil {
+						return nil, fmt.Errorf("enum value %q is not compatible with integer type %v", value, field.Type)
 					}
-				case reflect.Float64:
-					if _, err := strconv.ParseFloat(value, 64); err != nil {
-						return nil, fmt.Errorf("enum value %q is not compatible with type %v", value, field.Type)
+					enumValues[j] = intVal
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					uintVal, err := strconv.ParseUint(value, 10, 64)
+					if err != nil {
+						return nil, fmt.Errorf("enum value %q is not compatible with unsigned integer type %v", value, field.Type)
 					}
+					enumValues[j] = uintVal
+				case reflect.Float32, reflect.Float64:
+					floatVal, err := strconv.ParseFloat(value, 64)
+					if err != nil {
+						return nil, fmt.Errorf("enum value %q is not compatible with float type %v", value, field.Type)
+					}
+					enumValues[j] = floatVal
+				case reflect.Bool:
+					boolVal, err := strconv.ParseBool(value)
+					if err != nil {
+						return nil, fmt.Errorf("enum value %q is not compatible with boolean type %v", value, field.Type)
+					}
+					enumValues[j] = boolVal
 				default:
 					return nil, fmt.Errorf("unsupported type %v for enum validation", field.Type)
 				}
 			}
 			item.Enum = enumValues
 		}
+
+		// Handle default value
+		if defaultValue := field.Tag.Get("default"); defaultValue != "" {
+			// Convert string value to appropriate type based on field type
+			switch field.Type.Kind() {
+			case reflect.String:
+				item.Default = defaultValue
+			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+				intVal, err := strconv.Atoi(defaultValue)
+				if err != nil {
+					return nil, fmt.Errorf("default value %q is not compatible with integer type %v", defaultValue, field.Type)
+				}
+				item.Default = intVal
+			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+				uintVal, err := strconv.ParseUint(defaultValue, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("default value %q is not compatible with unsigned integer type %v", defaultValue, field.Type)
+				}
+				item.Default = uintVal
+			case reflect.Float32, reflect.Float64:
+				floatVal, err := strconv.ParseFloat(defaultValue, 64)
+				if err != nil {
+					return nil, fmt.Errorf("default value %q is not compatible with float type %v", defaultValue, field.Type)
+				}
+				item.Default = floatVal
+			case reflect.Bool:
+				boolVal, err := strconv.ParseBool(defaultValue)
+				if err != nil {
+					return nil, fmt.Errorf("default value %q is not compatible with boolean type %v", defaultValue, field.Type)
+				}
+				item.Default = boolVal
+			default:
+				// For complex types (arrays, objects), keep as string
+				// The consumer can parse it as needed
+				item.Default = defaultValue
+			}
+		}
+	}
+
+	for _, field := range anonymousFields {
+		object, err := reflectSchemaByObject(field.Type)
+		if err != nil {
+			return nil, err
+		}
+		for propName, propValue := range object.Properties {
+			if _, ok := properties[propName]; ok {
+				return nil, fmt.Errorf("duplicate property name %s in anonymous struct", propName)
+			}
+			properties[propName] = propValue
+		}
+		requiredFields = append(requiredFields, object.Required...)
 	}
 
 	property := &Property{
 		Type:       PropertyType{ObjectT},
 		Properties: properties,
 		Required:   requiredFields,
-		Enum:       enumValues,
 	}
 	return property, nil
 }

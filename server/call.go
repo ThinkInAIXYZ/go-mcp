@@ -12,7 +12,7 @@ import (
 )
 
 func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (*protocol.PingResult, error) {
-	sessionID, err := getSessionIDFromCtx(ctx)
+	sessionID, err := GetSessionIDFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (server *Server) Ping(ctx context.Context, request *protocol.PingRequest) (
 }
 
 func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMessageRequest) (*protocol.CreateMessageResult, error) {
-	sessionID, err := getSessionIDFromCtx(ctx)
+	sessionID, err := GetSessionIDFromCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,7 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 	}
 
 	if s.GetClientCapabilities() == nil || s.GetClientCapabilities().Sampling == nil {
-		return nil, pkg.ErrServerNotSupport
+		return nil, pkg.ErrClientNotSupport
 	}
 
 	response, err := server.callClient(ctx, sessionID, protocol.SamplingCreateMessage, request)
@@ -54,6 +54,20 @@ func (server *Server) Sampling(ctx context.Context, request *protocol.CreateMess
 		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 	return &result, nil
+}
+
+func (server *Server) SendProgressNotification(ctx context.Context, notify *protocol.ProgressNotification) error {
+	progressToken, err := getProgressTokenFromCtx(ctx)
+	if err != nil {
+		return err
+	}
+	notify.ProgressToken = progressToken
+
+	if err = server.sendMsgWithNotification(ctx, "", protocol.NotificationProgress, notify); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (server *Server) sendNotification4ToolListChanges(ctx context.Context) error {
@@ -130,8 +144,8 @@ func (server *Server) callClient(ctx context.Context, sessionID string, method p
 
 	requestID := strconv.FormatInt(session.IncRequestID(), 10)
 	respChan := make(chan *protocol.JSONRPCResponse, 1)
-	session.GetReqID2respChan().Set(requestID, respChan)
-	defer session.GetReqID2respChan().Remove(requestID)
+	session.GetServerReqID2respChan().Set(requestID, respChan)
+	defer session.GetServerReqID2respChan().Remove(requestID)
 
 	if err := server.sendMsgWithRequest(ctx, sessionID, requestID, method, params); err != nil {
 		return nil, fmt.Errorf("callClient: %w", err)

@@ -17,7 +17,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cli, err := client.NewClient(t, client.WithClientInfo(protocol.Implementation{
+	cli, err := client.NewClient(t, client.WithClientInfo(&protocol.Implementation{
 		Name:    "test",
 		Version: "1.0.0",
 	}))

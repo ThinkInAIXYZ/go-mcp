@@ -212,16 +212,23 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Disconnection SHOULD NOT be interpreted as the client canceling its request.
-	// To cancel, the client SHOULD explicitly send an MCP CancelledNotification.
-	ctx := pkg.NewCancelShieldContext(r.Context())
+	ctx := r.Context()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	// For InitializeRequest HTTP response
 	if t.stateMode == Stateful {
 		ctx = context.WithValue(ctx, SessionIDForReturnKey{}, &SessionIDForReturn{})
 	}
 
-	outputMsgCh, err := t.receiver.Receive(ctx, r.Header.Get(sessionIDHeader), bs)
+	// In stateless mode, ignore any session ID sent by the client (e.g. from MCP proxies)
+	// to avoid rejecting requests with stale or unrecognized session headers.
+	sessionID := ""
+	if t.stateMode == Stateful {
+		sessionID = r.Header.Get(sessionIDHeader)
+	}
+
+	outputMsgCh, err := t.receiver.Receive(ctx, sessionID, bs)
 	if err != nil {
 		if errors.Is(err, pkg.ErrSessionClosed) {
 			t.writeError(w, http.StatusNotFound, fmt.Sprintf("Failed to receive: %v", err))
@@ -237,23 +244,58 @@ func (t *streamableHTTPServerTransport) handlePost(w http.ResponseWriter, r *htt
 		return
 	}
 
-	msg := <-outputMsgCh
-	if len(msg) == 0 {
-		t.writeError(w, http.StatusInternalServerError, "handle request fail")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		t.writeError(w, http.StatusInternalServerError, "Streaming not supported")
 		return
 	}
 
-	if t.stateMode == Stateful {
-		if sid := ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn); sid.SessionID != "" { // in server.handleRequestWithInitialize assign
-			w.Header().Set(sessionIDHeader, sid.SessionID)
+	// Set headers for SSE
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	if protocol.IsInitializedRequest(bs) { // 判断是否是init请求
+		msg := <-outputMsgCh
+		if t.stateMode == Stateful {
+			w.Header().Set(sessionIDHeader, ctx.Value(SessionIDForReturnKey{}).(*SessionIDForReturn).SessionID)
 		}
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	if _, err = w.Write(msg); err != nil {
-		t.logger.Errorf("streamableHTTPServerTransport post write: %+v", err)
+		if _, err = fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+			t.logger.Errorf("Failed to write message: %v", err)
+		}
+		flusher.Flush()
 		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	go func() {
+		defer pkg.Recover()
+
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if _, e := fmt.Fprintf(w, " : heartbeat\n\n"); e != nil {
+					t.logger.Errorf("Failed to write heartbeat: %v", e)
+					continue
+				}
+				flusher.Flush()
+			}
+		}
+	}()
+
+	for msg := range outputMsgCh {
+		if _, err = fmt.Fprintf(w, "data: %s\n\n", msg); err != nil {
+			t.logger.Errorf("Failed to write message: %v", err)
+			continue
+		}
+		flusher.Flush()
 	}
 }
 

@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/ThinkInAIXYZ/go-mcp/pkg"
 )
@@ -30,15 +31,16 @@ func WithStdioClientOptionEnv(env ...string) StdioClientTransportOption {
 const mcpMessageDelimiter = '\n'
 
 type stdioClientTransport struct {
-	cmd      *exec.Cmd
-	receiver clientReceiver
-	reader   io.Reader
-	writer   io.WriteCloser
+	cmd       *exec.Cmd
+	receiver  clientReceiver
+	reader    io.Reader
+	writer    io.WriteCloser
+	errReader io.Reader
 
 	logger pkg.Logger
 
-	cancel          context.CancelFunc
-	receiveShutDone chan struct{}
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 }
 
 func NewStdioClientTransport(command string, args []string, opts ...StdioClientTransportOption) (ClientTransport, error) {
@@ -56,12 +58,18 @@ func NewStdioClientTransport(command string, args []string, opts ...StdioClientT
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+
 	t := &stdioClientTransport{
-		cmd:             cmd,
-		reader:          stdout,
-		writer:          stdin,
-		logger:          pkg.DefaultLogger,
-		receiveShutDone: make(chan struct{}),
+		cmd:       cmd,
+		reader:    stdout,
+		writer:    stdin,
+		errReader: stderr,
+
+		logger: pkg.DefaultLogger,
 	}
 
 	for _, opt := range opts {
@@ -78,11 +86,20 @@ func (t *stdioClientTransport) Start() error {
 	innerCtx, cancel := context.WithCancel(context.Background())
 	t.cancel = cancel
 
+	t.wg.Add(1)
 	go func() {
 		defer pkg.Recover()
+		defer t.wg.Done()
 
 		t.startReceive(innerCtx)
-		close(t.receiveShutDone)
+	}()
+
+	t.wg.Add(1)
+	go func() {
+		defer pkg.Recover()
+		defer t.wg.Done()
+
+		t.startReceiveErr(innerCtx)
 	}()
 
 	return nil
@@ -108,7 +125,7 @@ func (t *stdioClientTransport) Close() error {
 		return err
 	}
 
-	<-t.receiveShutDone
+	t.wg.Wait()
 
 	return nil
 }
@@ -119,11 +136,13 @@ func (t *stdioClientTransport) startReceive(ctx context.Context) {
 	for {
 		line, err := s.ReadBytes('\n')
 		if err != nil {
+			t.receiver.Interrupt(fmt.Errorf("stdout read error: %w", err))
+
 			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
 				errors.Is(err, io.EOF) {
 				return
 			}
-			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			t.logger.Errorf("stdout read error: %+v", err)
 			return
 		}
 
@@ -142,6 +161,37 @@ func (t *stdioClientTransport) startReceive(ctx context.Context) {
 			if err = t.receiver.Receive(ctx, line); err != nil {
 				t.logger.Errorf("receiver failed: %v", err)
 			}
+		}
+	}
+}
+
+func (t *stdioClientTransport) startReceiveErr(ctx context.Context) {
+	s := bufio.NewReader(t.errReader)
+
+	for {
+		line, err := s.ReadBytes('\n')
+		if err != nil {
+			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
+				errors.Is(err, io.EOF) {
+				return
+			}
+			t.logger.Errorf("client receive unexpected server error reading input: %v", err)
+			return
+		}
+
+		line = bytes.TrimRight(line, "\n")
+		// filter empty messages
+		// filter space messages and \t messages
+		if len(bytes.TrimFunc(line, func(r rune) bool { return r == ' ' || r == '\t' })) == 0 {
+			t.logger.Debugf("skipping empty message")
+			continue
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			t.logger.Errorf("receive server error: %s", line)
 		}
 	}
 }

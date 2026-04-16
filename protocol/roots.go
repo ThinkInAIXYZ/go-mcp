@@ -5,7 +5,7 @@ type ListRootsRequest struct{}
 
 // ListRootsResult represents the response to a list roots request
 type ListRootsResult struct {
-	Roots []Root `json:"roots"`
+	Roots []*Root `json:"roots"`
 }
 
 // Root represents a root directory or file that the server can operate on
@@ -25,7 +25,7 @@ func NewListRootsRequest() *ListRootsRequest {
 }
 
 // NewListRootsResult creates a new list roots response
-func NewListRootsResult(roots []Root) *ListRootsResult {
+func NewListRootsResult(roots []*Root) *ListRootsResult {
 	return &ListRootsResult{
 		Roots: roots,
 	}

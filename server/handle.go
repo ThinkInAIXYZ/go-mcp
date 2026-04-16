@@ -22,13 +22,14 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		return nil, err
 	}
 
-	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
-		return nil, fmt.Errorf("protocol version not supported, supported lastest version is %v", protocol.Version)
-	}
+	// Version negotiation: if client's version is supported, use it; otherwise use server's latest version
 	protocolVersion := request.ProtocolVersion
+	if _, ok := protocol.SupportedVersion[request.ProtocolVersion]; !ok {
+		protocolVersion = protocol.Version
+	}
 
 	if midVar, ok := ctx.Value(transport.SessionIDForReturnKey{}).(*transport.SessionIDForReturn); ok {
-		sessionID = server.sessionManager.CreateSession()
+		sessionID = server.sessionManager.CreateSession(ctx)
 		midVar.SessionID = sessionID
 	}
 
@@ -37,16 +38,11 @@ func (server *Server) handleRequestWithInitialize(ctx context.Context, sessionID
 		if !ok {
 			return nil, pkg.ErrLackSession
 		}
-		s.SetClientInfo(&request.ClientInfo, &request.Capabilities)
+		s.SetClientInfo(request.ClientInfo, request.Capabilities)
 		s.SetReceivedInitRequest()
 	}
 
-	return &protocol.InitializeResult{
-		ServerInfo:      *server.serverInfo,
-		Capabilities:    *server.capabilities,
-		ProtocolVersion: protocolVersion,
-		Instructions:    server.instructions,
-	}, nil
+	return protocol.NewInitializeResult(server.serverInfo, server.capabilities, protocolVersion, server.instructions), nil
 }
 
 func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*protocol.ListPromptsResult, error) {
@@ -61,12 +57,18 @@ func (server *Server) handleRequestWithListPrompts(rawParams json.RawMessage) (*
 		}
 	}
 
-	prompts := make([]protocol.Prompt, 0)
+	prompts := make([]*protocol.Prompt, 0)
 	server.prompts.Range(func(_ string, entry *promptEntry) bool {
-		prompts = append(prompts, *entry.prompt)
+		prompts = append(prompts, entry.prompt)
 		return true
 	})
-
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(prompts, request.Cursor, server.paginationLimit)
+		return &protocol.ListPromptsResult{
+			Prompts:    resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 	return &protocol.ListPromptsResult{
 		Prompts: prompts,
 	}, nil
@@ -93,7 +95,6 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 	if server.capabilities.Resources == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
-
 	var request *protocol.ListResourcesRequest
 	if len(rawParams) > 0 {
 		if err := pkg.JSONUnmarshal(rawParams, &request); err != nil {
@@ -101,11 +102,18 @@ func (server *Server) handleRequestWithListResources(rawParams json.RawMessage) 
 		}
 	}
 
-	resources := make([]protocol.Resource, 0)
+	resources := make([]*protocol.Resource, 0)
 	server.resources.Range(func(_ string, entry *resourceEntry) bool {
-		resources = append(resources, *entry.resource)
+		resources = append(resources, entry.resource)
 		return true
 	})
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(resources, request.Cursor, server.paginationLimit)
+		return &protocol.ListResourcesResult{
+			Resources:  resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 
 	return &protocol.ListResourcesResult{
 		Resources: resources,
@@ -124,12 +132,18 @@ func (server *Server) handleRequestWithListResourceTemplates(rawParams json.RawM
 		}
 	}
 
-	templates := make([]protocol.ResourceTemplate, 0)
+	templates := make([]*protocol.ResourceTemplate, 0)
 	server.resourceTemplates.Range(func(_ string, entry *resourceTemplateEntry) bool {
-		templates = append(templates, *entry.resourceTemplate)
+		templates = append(templates, entry.resourceTemplate)
 		return true
 	})
-
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(templates, request.Cursor, server.paginationLimit)
+		return &protocol.ListResourceTemplatesResult{
+			ResourceTemplates: resourcesToReturn,
+			NextCursor:        nextCursor,
+		}, err
+	}
 	return &protocol.ListResourceTemplatesResult{
 		ResourceTemplates: templates,
 	}, nil
@@ -205,7 +219,7 @@ func (server *Server) handleRequestWithUnSubscribeResourceChange(sessionID strin
 	return protocol.NewUnsubscribeResult(), nil
 }
 
-func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*protocol.ListToolsResult, error) {
+func (server *Server) handleRequestWithListTools(ctx context.Context, rawParams json.RawMessage) (*protocol.ListToolsResult, error) {
 	if server.capabilities.Tools == nil {
 		return nil, pkg.ErrServerNotSupport
 	}
@@ -222,7 +236,17 @@ func (server *Server) handleRequestWithListTools(rawParams json.RawMessage) (*pr
 		tools = append(tools, entry.tool)
 		return true
 	})
-
+	// Tool List Filter hook
+	if server.toolFilters != nil {
+		tools = server.toolFilters(ctx, tools)
+	}
+	if server.paginationLimit > 0 {
+		resourcesToReturn, nextCursor, err := protocol.PaginationLimit(tools, request.Cursor, server.paginationLimit)
+		return &protocol.ListToolsResult{
+			Tools:      resourcesToReturn,
+			NextCursor: nextCursor,
+		}, err
+	}
 	return &protocol.ListToolsResult{Tools: tools}, nil
 }
 
@@ -265,6 +289,26 @@ func (server *Server) handleNotifyWithInitialized(sessionID string, rawParams js
 		return fmt.Errorf("the server has not received the client's initialization request")
 	}
 	s.SetReady()
+	return nil
+}
+
+func (server *Server) handleNotifyWithCancelled(sessionID string, rawParams json.RawMessage) error {
+	var params protocol.CancelledNotification
+	if err := pkg.JSONUnmarshal(rawParams, &params); err != nil {
+		return err
+	}
+
+	s, ok := server.sessionManager.GetSession(sessionID)
+	if !ok {
+		return pkg.ErrLackSession
+	}
+
+	cancel, ok := s.GetClientReqID2cancelFunc().Get(fmt.Sprint(params.RequestID))
+	if !ok {
+		return nil
+	}
+	cancel()
+
 	return nil
 }
 

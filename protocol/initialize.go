@@ -1,18 +1,24 @@
 package protocol
 
+import (
+	"encoding/json"
+
+	"github.com/tidwall/gjson"
+)
+
 // InitializeRequest represents the initialize request sent from client to server
 type InitializeRequest struct {
-	ClientInfo      Implementation     `json:"clientInfo"`
-	Capabilities    ClientCapabilities `json:"capabilities"`
-	ProtocolVersion string             `json:"protocolVersion"`
+	ClientInfo      *Implementation     `json:"clientInfo"`
+	Capabilities    *ClientCapabilities `json:"capabilities"`
+	ProtocolVersion string              `json:"protocolVersion"`
 }
 
 // InitializeResult represents the server's response to an initialize request
 type InitializeResult struct {
-	ServerInfo      Implementation     `json:"serverInfo"`
-	Capabilities    ServerCapabilities `json:"capabilities"`
-	ProtocolVersion string             `json:"protocolVersion"`
-	Instructions    string             `json:"instructions,omitempty"`
+	ServerInfo      *Implementation     `json:"serverInfo"`
+	Capabilities    *ServerCapabilities `json:"capabilities"`
+	ProtocolVersion string              `json:"protocolVersion"`
+	Instructions    string              `json:"instructions,omitempty"`
 }
 
 // Implementation describes the name and version of an MCP implementation
@@ -59,7 +65,7 @@ type InitializedNotification struct {
 }
 
 // NewInitializeRequest creates a new initialize request
-func NewInitializeRequest(clientInfo Implementation, capabilities ClientCapabilities) *InitializeRequest {
+func NewInitializeRequest(clientInfo *Implementation, capabilities *ClientCapabilities) *InitializeRequest {
 	return &InitializeRequest{
 		ClientInfo:      clientInfo,
 		Capabilities:    capabilities,
@@ -68,11 +74,11 @@ func NewInitializeRequest(clientInfo Implementation, capabilities ClientCapabili
 }
 
 // NewInitializeResult creates a new initialize response
-func NewInitializeResult(serverInfo Implementation, capabilities ServerCapabilities, instructions string) *InitializeResult {
+func NewInitializeResult(serverInfo *Implementation, capabilities *ServerCapabilities, version string, instructions string) *InitializeResult {
 	return &InitializeResult{
 		ServerInfo:      serverInfo,
 		Capabilities:    capabilities,
-		ProtocolVersion: Version,
+		ProtocolVersion: version,
 		Instructions:    instructions,
 	}
 }
@@ -80,4 +86,8 @@ func NewInitializeResult(serverInfo Implementation, capabilities ServerCapabilit
 // NewInitializedNotification creates a new initialized notification
 func NewInitializedNotification() *InitializedNotification {
 	return &InitializedNotification{}
+}
+
+func IsInitializedRequest(rawParams json.RawMessage) bool {
+	return gjson.ParseBytes(rawParams).Get("method").String() == string(Initialize)
 }

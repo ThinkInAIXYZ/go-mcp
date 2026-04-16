@@ -75,11 +75,13 @@ func (t *mockClientTransport) startReceive(ctx context.Context) {
 	for {
 		line, err := s.ReadBytes('\n')
 		if err != nil {
+			t.receiver.Interrupt(fmt.Errorf("reader read error: %w", err))
+
 			if errors.Is(err, io.ErrClosedPipe) || // This error occurs during unit tests, suppressing it here
 				errors.Is(err, io.EOF) {
 				return
 			}
-			t.logger.Errorf("client receive unexpected error reading input: %v", err)
+			t.logger.Errorf("reader read error: %+v", err)
 			return
 		}
 

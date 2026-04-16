@@ -32,7 +32,7 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	}
 
 	// Create MCP client using transport
-	mcpClient, err := client.NewClient(transportClient, client.WithClientInfo(protocol.Implementation{
+	mcpClient, err := client.NewClient(transportClient, client.WithClientInfo(&protocol.Implementation{
 		Name:    "Example MCP Client",
 		Version: "1.0.0",
 	}), client.WithSamplingHandler(&sampling{}))
@@ -57,6 +57,20 @@ func test(t *testing.T, runServer func() error, transportClient transport.Client
 	callResult, err := mcpClient.CallTool(
 		context.Background(),
 		protocol.NewCallToolRequestWithRawArguments("current_time", json.RawMessage(`{"timezone": "UTC"}`)))
+	if err != nil {
+		t.Fatalf("Failed to call tool: %v", err)
+	}
+	bytes, _ = json.Marshal(callResult)
+	fmt.Printf("Tool call result: %s\n", bytes)
+
+	progressCh := make(chan *protocol.ProgressNotification)
+	go func() {
+		for progress := range progressCh {
+			fmt.Printf("Progress: %+v\n", progress)
+		}
+	}()
+	callResult, err = mcpClient.CallToolWithProgressChan(context.Background(),
+		protocol.NewCallToolRequestWithRawArguments("generate_ppt", json.RawMessage(`{"ppt_description": "test"}`)), progressCh)
 	if err != nil {
 		t.Fatalf("Failed to call tool: %v", err)
 	}

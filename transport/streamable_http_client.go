@@ -39,6 +39,12 @@ func WithStreamableHTTPClientOptionLogger(log pkg.Logger) StreamableHTTPClientTr
 	}
 }
 
+func WithStreamableHTTPClientOptionHeader(headers map[string]string) StreamableHTTPClientTransportOption {
+	return func(t *streamableHTTPClientTransport) {
+		t.headers = headers
+	}
+}
+
 type streamableHTTPClientTransport struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -53,6 +59,7 @@ type streamableHTTPClientTransport struct {
 	client         *http.Client
 
 	sseInFlyConnect sync.WaitGroup
+	headers         map[string]string
 }
 
 func NewStreamableHTTPClientTransport(serverURL string, opts ...StreamableHTTPClientTransportOption) (ClientTransport, error) {
@@ -71,6 +78,7 @@ func NewStreamableHTTPClientTransport(serverURL string, opts ...StreamableHTTPCl
 		logger:         pkg.DefaultLogger,
 		receiveTimeout: time.Second * 30,
 		client:         http.DefaultClient,
+		headers:        make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -100,6 +108,10 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, text/event-stream")
+
+	for key, value := range t.headers {
+		req.Header.Set(key, value)
+	}
 
 	if sessionID := t.sessionID.Load(); sessionID != "" {
 		req.Header.Set(sessionIDHeader, sessionID)
@@ -161,14 +173,14 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 }
 
 func (t *streamableHTTPClientTransport) startSSEStream() {
-	timer := time.NewTimer(time.Second)
-	defer timer.Stop()
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	for {
-		timer.Reset(time.Second)
 		select {
 		case <-t.ctx.Done():
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			sessionID := t.sessionID.Load()
 			if sessionID == "" {
 				continue // Try again after 1 second, waiting for the POST request to initialize the SessionID to complete
@@ -185,6 +197,11 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 
 			resp, err := t.client.Do(req)
 			if err != nil {
+				select {
+				case <-t.ctx.Done():
+					return
+				default:
+				}
 				t.logger.Errorf("failed to connect to SSE stream: %v", err)
 				continue
 			}
