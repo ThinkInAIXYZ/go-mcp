@@ -2,7 +2,6 @@ package protocol
 
 import (
 	"reflect"
-	"slices"
 	"sort"
 	"testing"
 )
@@ -403,6 +402,18 @@ func compareInputSchema(a, b *InputSchema) bool {
 	return true
 }
 
+func equalPropertyType(a, b PropertyType) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // compareProperty Compare the contents of two Property structures
 func compareProperty(a, b *Property) bool {
 	if a == nil && b == nil {
@@ -411,7 +422,7 @@ func compareProperty(a, b *Property) bool {
 	if a == nil || b == nil {
 		return false
 	}
-	if !slices.Equal(a.Type, b.Type) {
+	if !equalPropertyType(a.Type, b.Type) {
 		return false
 	}
 	if a.Description != b.Description {
