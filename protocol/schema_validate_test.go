@@ -490,3 +490,37 @@ func Test_validate_unionType(t *testing.T) {
 		t.Fatal("bool should not match union string|number")
 	}
 }
+
+// TestIssue198_ListTools_jsonUnmarshal reproduces GitHub issue #198: remote schemas used
+// JSON Schema type as an array (union) and sometimes $ref under items; decoding must not error.
+func TestIssue198_ListTools_jsonUnmarshal(t *testing.T) {
+	payload := `{"tools":[` +
+		`{"name":"generate_heatmap_chart","inputSchema":{` +
+		`"type":"object","properties":{` +
+		`"data":{"type":"array","items":{` +
+		`"type":"object","properties":{` +
+		`"x":{"type":["string","number"]},` +
+		`"y":{"type":["string","number"]},` +
+		`"value":{"type":"number"}},"required":["x","y","value"],"additionalProperties":false` +
+		`}}},"required":["data"],"additionalProperties":false}},` +
+		`{"name":"generate_treemap_chart","inputSchema":{` +
+		`"type":"object","properties":{` +
+		`"data":{"type":"array","items":{` +
+		`"type":"object","properties":{` +
+		`"name":{"type":"string"},"value":{"type":"number"},` +
+		`"children":{"type":"array","items":{"$ref":"#/properties/data/items"}}},` +
+		`"required":["name","value"],"additionalProperties":false` +
+		`}}},"required":["data"],"additionalProperties":false}}` +
+		`]}`
+	var got ListToolsResult
+	if err := json.Unmarshal([]byte(payload), &got); err != nil {
+		t.Fatalf("unmarshal ListToolsResult: %v", err)
+	}
+	if len(got.Tools) != 2 {
+		t.Fatalf("tools len = %d", len(got.Tools))
+	}
+	heat := got.Tools[0].InputSchema.Properties["data"].Items.Properties["x"]
+	if len(heat.Type) != 2 || heat.Type[0] != String || heat.Type[1] != Number {
+		t.Fatalf("heatmap x.Type = %#v", heat.Type)
+	}
+}
