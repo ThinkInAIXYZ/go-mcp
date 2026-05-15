@@ -121,7 +121,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-	if resp.Header.Get("Content-Type") != "text/event-stream" {
+	if !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 		defer resp.Body.Close()
 	}
 
@@ -148,7 +148,7 @@ func (t *streamableHTTPClientTransport) Send(ctx context.Context, msg Message) e
 	contentType := resp.Header.Get("Content-Type")
 	// Handle different response types
 	switch {
-	case contentType == "text/event-stream":
+	case strings.HasPrefix(contentType, "text/event-stream"):
 		go func() {
 			defer pkg.Recover()
 
