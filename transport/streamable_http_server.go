@@ -360,6 +360,11 @@ func (t *streamableHTTPServerTransport) handleGet(w http.ResponseWriter, r *http
 }
 
 func (t *streamableHTTPServerTransport) handleDelete(w http.ResponseWriter, r *http.Request) {
+	if t.stateMode == Stateless {
+		t.writeError(w, http.StatusMethodNotAllowed, "server is stateless, does not support session termination")
+		return
+	}
+
 	sessionID := r.Header.Get("Mcp-Session-Id")
 	if sessionID == "" {
 		t.writeError(w, http.StatusBadRequest, "Missing session ID")
