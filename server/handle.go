@@ -300,7 +300,10 @@ func (server *Server) handleNotifyWithCancelled(sessionID string, rawParams json
 
 	s, ok := server.sessionManager.GetSession(sessionID)
 	if !ok {
-		return pkg.ErrLackSession
+		// No session to match the request against (e.g. stateless mode). Per the
+		// cancellation spec a notification referencing an unknown request is
+		// fire-and-forget and must be ignored, not answered with an error.
+		return nil
 	}
 
 	cancel, ok := s.GetClientReqID2cancelFunc().Get(fmt.Sprint(params.RequestID))
