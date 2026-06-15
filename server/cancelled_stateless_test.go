@@ -24,6 +24,6 @@ func TestStatelessCancelledNotificationIgnored(t *testing.T) {
 
 	// sessionID "" => no session (stateless); must be ignored, returning nil.
 	if err := s.handleNotifyWithCancelled("", params); err != nil {
-		t.Fatalf("stateless cancelled notification: got err %v, want nil (ignored)", err)
+		t.Fatalf("stateless cancellation notification: got err %v, want nil (ignored)", err)
 	}
 }
