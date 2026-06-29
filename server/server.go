@@ -62,6 +62,26 @@ func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
 	}
 }
 
+// TimeoutMiddleware returns a middleware that enforces a per-tool execution timeout.
+// If the tool handler does not complete within the given duration, the context is
+// canceled and a timeout error is returned. This prevents slow or hanging tools
+// from blocking the MCP server.
+//
+// Example:
+//
+//	server.RegisterTool(&protocol.Tool{Name: "search"},
+//	    server.TimeoutMiddleware(30*time.Second)(myHandler),
+//	)
+func TimeoutMiddleware(timeout time.Duration) ToolMiddleware {
+	return func(next ToolHandlerFunc) ToolHandlerFunc {
+		return func(ctx context.Context, req *protocol.CallToolRequest) (*protocol.CallToolResult, error) {
+			ctx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+			return next(ctx, req)
+		}
+	}
+}
+
 func WithPagination(limit int) Option {
 	return func(s *Server) {
 		s.paginationLimit = limit
