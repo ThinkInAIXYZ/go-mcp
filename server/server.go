@@ -64,7 +64,7 @@ func RateLimitMiddleware(limiter pkg.RateLimiter) ToolMiddleware {
 
 // TimeoutMiddleware returns a middleware that enforces a per-tool execution timeout.
 // If the tool handler does not complete within the given duration, the context is
-// cancelled and a timeout error is returned. This prevents slow or hanging tools
+// canceled and a timeout error is returned. This prevents slow or hanging tools
 // from blocking the MCP server.
 //
 // Example:
