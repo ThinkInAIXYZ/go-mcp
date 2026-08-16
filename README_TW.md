@@ -252,4 +252,4 @@ Go-MCP 採用優雅的三層架構設計：
 
 ## 📈 專案趨勢
 
-[![Star 歷史](https://api.star-history.com/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://www.star-history.com/#ThinkInAIXYZ/go-mcp&Date)
+[![Star 歷史](https://star-history.dera.page/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://star-history.dera.page/#ThinkInAIXYZ/go-mcp&Date)

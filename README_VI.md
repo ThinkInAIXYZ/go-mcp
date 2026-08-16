@@ -253,4 +253,4 @@ Cảm ơn tất cả các nhà phát triển đã đóng góp cho dự án này!
 
 ## 📈 Xu hướng dự án
 
-[![Star History](https://api.star-history.com/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://www.star-history.com/#ThinkInAIXYZ/go-mcp&Date)
+[![Star History](https://star-history.dera.page/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://star-history.dera.page/#ThinkInAIXYZ/go-mcp&Date)
