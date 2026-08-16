@@ -258,4 +258,4 @@ Thanks to all developers who have contributed to this project!
 
 ## 📈 Project Trends
 
-[![Star History](https://api.star-history.com/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://www.star-history.com/#ThinkInAIXYZ/go-mcp&Date)
+[![Star History](https://star-history.dera.page/svg?repos=ThinkInAIXYZ/go-mcp&type=Date)](https://star-history.dera.page/#ThinkInAIXYZ/go-mcp&Date)
