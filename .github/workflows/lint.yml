@@ -30,8 +30,14 @@ jobs:
       matrix: ${{ fromJson(needs.resolve-modules.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          # Keep the toolchain compatible with golangci-lint v2.1.6 (built with Go 1.24).
+          go-version: '1.24.x'
+          cache-dependency-path: ${{ matrix.workdir }}/go.sum
       - name: Lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.1
+          version: v2.1.6
           working-directory: ${{ matrix.workdir }}
