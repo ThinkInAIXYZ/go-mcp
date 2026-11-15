@@ -192,6 +192,10 @@ func (t *streamableHTTPClientTransport) startSSEStream() {
 				return
 			}
 
+			for key, value := range t.headers {
+				req.Header.Set(key, value)
+			}
+
 			req.Header.Set("Accept", "text/event-stream")
 			req.Header.Set(sessionIDHeader, sessionID)
 
@@ -291,6 +295,9 @@ func (t *streamableHTTPClientTransport) Close() error {
 		req, err := http.NewRequest(http.MethodDelete, t.serverURL.String(), nil)
 		if err != nil {
 			return err
+		}
+		for key, value := range t.headers {
+			req.Header.Set(key, value)
 		}
 		req.Header.Set(sessionIDHeader, sessionID)
 		resp, err := t.client.Do(req)
