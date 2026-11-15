@@ -26,6 +26,11 @@ func TestSSEClientTransport_multilineData(t *testing.T) {
 			want:   []string{"{\n\"id\":1,\n\"result\":{}\n}"},
 		},
 		{
+			name:   "EOF after data line",
+			stream: "data: first\ndata: second\n",
+			want:   []string{"first\nsecond"},
+		},
+		{
 			name:   "empty data lines",
 			stream: "data:\ndata: first\ndata:\ndata: last\ndata:\n\n",
 			want:   []string{"\nfirst\n\nlast\n"},
