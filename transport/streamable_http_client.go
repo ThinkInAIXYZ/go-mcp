@@ -243,7 +243,7 @@ func (t *streamableHTTPClientTransport) handleSSEStream(reader io.ReadCloser) {
 			if err == io.EOF {
 				// Process any pending event before exit
 				if data != "" {
-					t.processSSEEvent(data)
+					t.processSSEEvent(strings.TrimSuffix(data, "\n"))
 				}
 				break
 			}
@@ -261,14 +261,14 @@ func (t *streamableHTTPClientTransport) handleSSEStream(reader io.ReadCloser) {
 		if line == "" {
 			// Empty line means end of event
 			if data != "" {
-				t.processSSEEvent(data)
-				_, data = "", ""
+				t.processSSEEvent(strings.TrimSuffix(data, "\n"))
+				data = ""
 			}
 			continue
 		}
 
 		if strings.HasPrefix(line, "data:") {
-			data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			data += strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " ") + "\n"
 		}
 	}
 }

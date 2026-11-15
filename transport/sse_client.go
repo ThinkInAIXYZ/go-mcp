@@ -174,7 +174,7 @@ func (t *sseClientTransport) readSSE(reader io.ReadCloser) error {
 			if err == io.EOF {
 				// Process any pending event before exit
 				if event != "" && data != "" {
-					t.handleSSEEvent(event, data)
+					t.handleSSEEvent(event, strings.TrimSuffix(data, "\n"))
 				}
 			}
 			select {
@@ -190,7 +190,7 @@ func (t *sseClientTransport) readSSE(reader io.ReadCloser) error {
 		if line == "" {
 			// Empty line means end of event
 			if event != "" && data != "" {
-				t.handleSSEEvent(event, data)
+				t.handleSSEEvent(event, strings.TrimSuffix(data, "\n"))
 				event = ""
 				data = ""
 			}
@@ -200,7 +200,7 @@ func (t *sseClientTransport) readSSE(reader io.ReadCloser) error {
 		if strings.HasPrefix(line, "event:") {
 			event = strings.TrimSpace(strings.TrimPrefix(line, "event:"))
 		} else if strings.HasPrefix(line, "data:") {
-			data = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+			data += strings.TrimPrefix(strings.TrimPrefix(line, "data:"), " ") + "\n"
 		}
 	}
 }
