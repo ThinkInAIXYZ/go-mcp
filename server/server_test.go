@@ -511,6 +511,11 @@ func testServerInit(t *testing.T, server *Server, in io.Writer, outScan *bufio.S
 }
 
 func TestServerHandleForPage(t *testing.T) {
+	const (
+		pageSize  = 5
+		pageCount = 2
+		total     = pageSize * pageCount
+	)
 	reader1, writer1 := io.Pipe()
 	reader2, writer2 := io.Pipe()
 
@@ -540,12 +545,11 @@ func TestServerHandleForPage(t *testing.T) {
 			Name:    "ExampleServer",
 			Version: "1.0.0",
 		}),
-		WithPagination(5),
+		WithPagination(pageSize),
 	)
 	if err != nil {
 		t.Fatalf("NewServer: %+v", err)
 	}
-	total := 10
 	// add tool
 	for i := 0; i < total; i++ {
 		testTool, err := protocol.NewTool(fmt.Sprintf("test_tool_%d", i), fmt.Sprintf("test_tool_%d", i), currentTimeReq{})
@@ -676,9 +680,8 @@ func TestServerHandleForPage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			uuid, _ := uuid.NewUUID()
-			totalResq := 0
 			req := protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
-			for i := 0; i < 3; i++ {
+			for i := 0; i < pageCount; i++ {
 				reqBytes, err := json.Marshal(req)
 				if err != nil {
 					t.Fatalf("json Marshal: %+v", err)
@@ -698,38 +701,44 @@ func TestServerHandleForPage(t *testing.T) {
 					Jsonrpc string      `json:"jsonrpc"`
 					ID      interface{} `json:"id"`
 					Result  struct {
-						NextCursor        string        `json:"nextCursor"`
-						Tools             []interface{} `json:"tools"`
-						Prompts           []interface{} `json:"prompts"`
-						Resources         []interface{} `json:"resources"`
-						ResourceTemplates []interface{} `json:"resourceTemplates"`
+						NextCursor        json.RawMessage `json:"nextCursor"`
+						Tools             []interface{}   `json:"tools"`
+						Prompts           []interface{}   `json:"prompts"`
+						Resources         []interface{}   `json:"resources"`
+						ResourceTemplates []interface{}   `json:"resourceTemplates"`
 					} `json:"result"`
 				}{}
 				if err = pkg.JSONUnmarshal(respBytes, &respStruct); err != nil {
 					t.Fatal(err)
 				}
 
-				if respStruct.Result.NextCursor == "" {
+				result := respStruct.Result
+				pageLength := len(result.Tools) + len(result.Prompts) + len(result.Resources) + len(result.ResourceTemplates)
+				if pageLength != pageSize {
+					t.Fatalf("page %d has %d entries, want %d", i+1, pageLength, pageSize)
+				}
+				if i == pageCount-1 {
+					if result.NextCursor != nil {
+						t.Fatalf("final page has nextCursor %s, want it omitted", result.NextCursor)
+					}
 					break
+				}
+				var cursor protocol.Cursor
+				if err := json.Unmarshal(result.NextCursor, &cursor); err != nil || cursor == "" {
+					t.Fatalf("page %d has nextCursor %s, want a nonempty string", i+1, result.NextCursor)
 				}
 				switch tt.method {
 				case protocol.ToolsList:
-					tt.request = protocol.ListToolsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+					tt.request = protocol.ListToolsRequest{Cursor: cursor}
 				case protocol.PromptsList:
-					tt.request = protocol.ListPromptsRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+					tt.request = protocol.ListPromptsRequest{Cursor: cursor}
 				case protocol.ResourceListTemplates:
-					tt.request = protocol.ListResourceTemplatesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+					tt.request = protocol.ListResourceTemplatesRequest{Cursor: cursor}
 				case protocol.ResourcesList:
-					tt.request = protocol.ListResourcesRequest{Cursor: protocol.Cursor(respStruct.Result.NextCursor)}
+					tt.request = protocol.ListResourcesRequest{Cursor: cursor}
 				}
 				req = protocol.NewJSONRPCRequest(uuid, tt.method, tt.request)
-				totalResq = totalResq + len(respStruct.Result.Tools) + len(respStruct.Result.Prompts) +
-					len(respStruct.Result.Resources) + len(respStruct.Result.ResourceTemplates)
 			}
-			if total != totalResq {
-				t.Fatalf("totalResq: %d, total: %d", totalResq, total)
-			}
-			// t.Logf("totalResq: %d,total:%d", totalResq, total)
 		})
 	}
 }
