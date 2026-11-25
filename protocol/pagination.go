@@ -28,22 +28,13 @@ func PaginationLimit[T Named](allElements []T, cursor Cursor, limit int) ([]T, C
 			return nc > cString
 		})
 	}
-	endPos := len(allElements)
-	if len(allElements) > startPos+limit {
-		endPos = startPos + limit
+	if limit >= len(allElements)-startPos {
+		return allElements[startPos:], "", nil
 	}
-	elementsToReturn := allElements[startPos:endPos]
-	// set the next cursor
-	nextCursor := func() Cursor {
-		if len(elementsToReturn) < limit {
-			return ""
-		}
-		element := elementsToReturn[len(elementsToReturn)-1]
-		nc := element.GetName()
-		toString := base64.StdEncoding.EncodeToString([]byte(nc))
-		return Cursor(toString)
-	}()
-	return elementsToReturn, nextCursor, nil
+	endPos := startPos + limit
+	lastName := allElements[endPos-1].GetName()
+	nextCursor := base64.StdEncoding.EncodeToString([]byte(lastName))
+	return allElements[startPos:endPos], Cursor(nextCursor), nil
 }
 
 // PaginatedRequest represents a request that supports pagination
